@@ -1,0 +1,208 @@
+//! SpecterScript CLI
+//! v0.9: Single optimized VM, no legacy flags
+
+use std::env;
+use std::fs;
+use std::io::{self, Write};
+use std::process;
+
+use specterscript::{Lexer, Parser, Interpreter, SpectreError, VM, Compiler, Value};
+
+fn main() {
+    let args: Vec<String> = env::args().collect();
+    
+    let (use_vm, file_path) = parse_args(&args);
+
+    match file_path {
+        None => run_repl(use_vm),
+        Some(path) => run_file(&path, use_vm),
+    }
+}
+
+fn parse_args(args: &[String]) -> (bool, Option<String>) {
+    let mut use_vm = false;
+    let mut file_path = None;
+
+    for arg in args.iter().skip(1) {
+        if arg == "--vm" {
+            use_vm = true;
+        } else if arg == "--help" || arg == "-h" {
+            print_usage();
+            process::exit(0);
+        } else if arg.starts_with('-') {
+            eprintln!("Unknown flag: {}", arg);
+            print_usage();
+            process::exit(64);
+        } else {
+            file_path = Some(arg.clone());
+        }
+    }
+
+    (use_vm, file_path)
+}
+
+fn print_usage() {
+    println!("SpecterScript v1.0.0");
+    println!();
+    println!("Usage:");
+    println!("  specter                   Start REPL");
+    println!("  specter <script.sp>       Run script (interpreter)");
+    println!("  specter --vm <script>     Run script (fast VM)");
+    println!();
+    println!("Options:");
+    println!("  --vm    Use bytecode VM (10x faster)");
+    println!("  --help  Show this message");
+}
+
+fn run_repl(use_vm: bool) {
+    let mode_str = if use_vm { "vm" } else { "interpreter" };
+    println!("SpecterScript REPL v1.0.0 ({})", mode_str);
+    println!("Type 'exit' to quit\n");
+
+    let mut interpreter = Interpreter::new();
+    let mut input = String::new();
+
+    loop {
+        print!(">> ");
+        let _ = io::stdout().flush();
+
+        input.clear();
+        if io::stdin().read_line(&mut input).is_err() {
+            break;
+        }
+
+        let line = input.trim();
+        if line == "exit" || line == "quit" {
+            break;
+        }
+
+        if line.is_empty() {
+            continue;
+        }
+
+        let result = if use_vm {
+            run_vm(line)
+        } else {
+            run_interpreter(line, &mut interpreter)
+        };
+
+        match result {
+            Ok(value) => {
+                if !matches!(value, Value::Nil) {
+                    println!("=> {}", value);
+                }
+            }
+            Err(e) => eprintln!("Error: {}", e.message()),
+        }
+    }
+}
+
+fn run_file(path: &str, use_vm: bool) {
+    let source = match fs::read_to_string(path) {
+        Ok(s) => s,
+        Err(e) => {
+            eprintln!("Error reading file '{}': {}", path, e);
+            process::exit(66);
+        }
+    };
+
+    let result = if use_vm {
+        run_vm(&source)
+    } else {
+        let mut interpreter = Interpreter::new();
+        run_interpreter(&source, &mut interpreter)
+    };
+
+    if let Err(e) = result {
+        report_error(&source, &e);
+        process::exit(70);
+    }
+}
+
+fn run_interpreter(source: &str, interpreter: &mut Interpreter) -> Result<Value, SpectreError> {
+    let lexer = Lexer::new(source);
+    let tokens: Vec<_> = lexer.collect();
+
+    for token in &tokens {
+        if let specterscript::TokenKind::Error(msg) = &token.kind {
+            return Err(SpectreError::Lexer {
+                message: msg.clone(),
+                span: token.span,
+            });
+        }
+    }
+
+    let mut parser = Parser::new(tokens);
+    let program = parser.parse_program()?;
+    interpreter.interpret(&program)
+}
+
+fn run_vm(source: &str) -> Result<Value, SpectreError> {
+    let lexer = Lexer::new(source);
+    let tokens: Vec<_> = lexer.collect();
+
+    for token in &tokens {
+        if let specterscript::TokenKind::Error(msg) = &token.kind {
+            return Err(SpectreError::Lexer {
+                message: msg.clone(),
+                span: token.span,
+            });
+        }
+    }
+
+    let mut parser = Parser::new(tokens);
+    let program = parser.parse_program()?;
+
+    let mut compiler = Compiler::new();
+    let chunk = compiler.compile(&program)?;
+    let global_names = compiler.global_names();
+    let functions = compiler.functions();
+
+    let mut vm = VM::new();
+    let result = vm.run_with_functions(&chunk, global_names, functions)?;
+    
+    Ok(nanbox_to_value(result))
+}
+
+fn nanbox_to_value(nb: specterscript::vm::NanBoxed) -> Value {
+    if nb.is_nil() {
+        Value::Nil
+    } else if nb.is_bool() {
+        Value::Bool(nb.as_bool())
+    } else if nb.is_number() {
+        Value::Number(nb.as_number())
+    } else if nb.is_integer() {
+        Value::Integer(nb.as_integer())
+    } else if nb.is_ptr() {
+        let obj = unsafe { &*nb.as_ptr() };
+        match &obj.data {
+            specterscript::vm::HeapData::String(s) => Value::String(s.to_string()),
+            specterscript::vm::HeapData::List(items) => {
+                Value::List(items.iter().map(|v| nanbox_to_value(*v)).collect())
+            }
+            specterscript::vm::HeapData::Map(map) => {
+                Value::Map(map.iter().map(|(k, v)| (k.to_string(), nanbox_to_value(*v))).collect())
+            }
+            specterscript::vm::HeapData::Function(f) => {
+                Value::String(format!("<fn {}>", f.name))
+            }
+        }
+    } else {
+        Value::Nil
+    }
+}
+
+fn report_error(source: &str, error: &SpectreError) {
+    eprintln!("Error: {}", error.message());
+    
+    if let Some(span) = error.span() {
+        let lines: Vec<_> = source.lines().collect();
+        if span.line > 0 && span.line <= lines.len() {
+            let line_content = lines[span.line - 1];
+            eprintln!("  --> line {}", span.line);
+            eprintln!("   |");
+            eprintln!("{:3} | {}", span.line, line_content);
+            eprintln!("   | {}^", " ".repeat(span.column.saturating_sub(1)));
+        }
+    }
+}

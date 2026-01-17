@@ -368,21 +368,7 @@ impl Compiler {
                 } else {
                     self.compile_expr(left)?;
                     self.compile_expr(right)?;
-                    match op {
-                        BinaryOp::Add => self.emit(OpCode::Add, line),
-                        BinaryOp::Sub => self.emit(OpCode::Sub, line),
-                        BinaryOp::Mul => self.emit(OpCode::Mul, line),
-                        BinaryOp::Div => self.emit(OpCode::Div, line),
-                        BinaryOp::Mod => self.emit(OpCode::Mod, line),
-                        BinaryOp::Pow => self.emit(OpCode::Pow, line),
-                        BinaryOp::Eq => self.emit(OpCode::Eq, line),
-                        BinaryOp::Ne => self.emit(OpCode::Ne, line),
-                        BinaryOp::Lt => self.emit(OpCode::Lt, line),
-                        BinaryOp::Gt => self.emit(OpCode::Gt, line),
-                        BinaryOp::Le => self.emit(OpCode::Le, line),
-                        BinaryOp::Ge => self.emit(OpCode::Ge, line),
-                        _ => {}
-                    }
+                    self.emit_binary_op(op, line);
                 }
                 Ok(())
             }
@@ -436,6 +422,23 @@ impl Compiler {
         let offset = self.chunk.len().saturating_sub(loop_start) + 2;
         let offset = offset.min(u16::MAX as usize);
         self.chunk.write_u16(offset as u16, line);
+    }
+    fn emit_binary_op(&mut self, op: &BinaryOp, line: usize) {
+        match op {
+            BinaryOp::Add => self.emit(OpCode::Add, line),
+            BinaryOp::Sub => self.emit(OpCode::Sub, line),
+            BinaryOp::Mul => self.emit(OpCode::Mul, line),
+            BinaryOp::Div => self.emit(OpCode::Div, line),
+            BinaryOp::Mod => self.emit(OpCode::Mod, line),
+            BinaryOp::Pow => self.emit(OpCode::Pow, line),
+            BinaryOp::Eq => self.emit(OpCode::Eq, line),
+            BinaryOp::Ne => self.emit(OpCode::Ne, line),
+            BinaryOp::Lt => self.emit(OpCode::Lt, line),
+            BinaryOp::Gt => self.emit(OpCode::Gt, line),
+            BinaryOp::Le => self.emit(OpCode::Le, line),
+            BinaryOp::Ge => self.emit(OpCode::Ge, line),
+            _ => {}
+        }
     }
     fn add_global(&mut self, name: String) -> u8 {
         for (i, n) in self.global_names.iter().enumerate() {

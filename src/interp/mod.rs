@@ -1,6 +1,6 @@
-mod value;
 mod env;
 mod eval;
-pub use value::{Value, FunctionValue, LambdaValue, NativeFn};
+mod value;
 pub use env::Environment;
 pub use eval::Interpreter;
+pub use value::{FunctionValue, LambdaValue, NativeFn, Value};

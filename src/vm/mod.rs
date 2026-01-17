@@ -1,12 +1,12 @@
-mod opcode;
 mod chunk;
 mod compiler;
 mod nanbox;
+mod opcode;
 mod vm_nanbox;
-pub use opcode::OpCode;
 pub use chunk::Chunk;
 pub use compiler::Compiler;
-pub use nanbox::{NanBoxed, HeapObject, HeapData, ObjectTag, CompiledFunction};
-pub use nanbox::{heap_stats, check_leaks, reset_stats};
+pub use nanbox::{check_leaks, heap_stats, reset_stats};
+pub use nanbox::{CompiledFunction, HeapData, HeapObject, NanBoxed, ObjectTag};
+pub use opcode::OpCode;
 pub use vm_nanbox::VMNanBox;
 pub use vm_nanbox::VMNanBox as VM;

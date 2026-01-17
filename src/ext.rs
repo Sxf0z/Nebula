@@ -1,5 +1,5 @@
+use crate::error::{ErrorCode, NebulaError, NebulaResult};
 use crate::interp::Value;
-use crate::error::{NebulaError, NebulaResult, ErrorCode};
 pub type ExtResult<T> = Result<T, ExtError>;
 #[derive(Debug, Clone)]
 pub struct ExtError {
@@ -7,7 +7,9 @@ pub struct ExtError {
 }
 impl ExtError {
     pub fn new(msg: impl Into<String>) -> Self {
-        Self { message: msg.into() }
+        Self {
+            message: msg.into(),
+        }
     }
 }
 impl From<ExtError> for NebulaError {
@@ -100,7 +102,9 @@ impl ExtensionRegistry {
         self.functions.get(name)
     }
     pub fn call(&self, name: &str, args: &[Value]) -> NebulaResult<Value> {
-        let func = self.functions.get(name)
+        let func = self
+            .functions
+            .get(name)
             .ok_or_else(|| NebulaError::coded(ErrorCode::E010, name))?;
         func.validate_args(args.len())?;
         let ctx = ExtensionContext::new(name, args.len());

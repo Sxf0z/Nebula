@@ -1,7 +1,7 @@
+use super::value::Value;
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
-use std::cell::RefCell;
-use super::value::Value;
 #[derive(Debug, Clone)]
 pub struct Environment {
     values: HashMap<String, Value>,
@@ -10,7 +10,7 @@ pub struct Environment {
 impl Environment {
     pub fn new() -> Self {
         Self {
-            values: HashMap::with_capacity(16), 
+            values: HashMap::with_capacity(16),
             parent: None,
         }
     }

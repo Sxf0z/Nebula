@@ -1,6 +1,6 @@
-use super::token::{Token, TokenKind, Span};
+use super::token::{Span, Token, TokenKind};
 pub struct Lexer<'src> {
-    #[allow(dead_code)] 
+    #[allow(dead_code)]
     source: &'src str,
     chars: Vec<char>,
     current: usize,
@@ -143,8 +143,8 @@ impl<'src> Lexer<'src> {
             '"' => self.scan_string('"'),
             '\'' => {
                 if self.peek() == '\'' && self.peek_next() == Some('\'') {
-                    self.advance(); 
-                    self.advance(); 
+                    self.advance();
+                    self.advance();
                     self.scan_block_comment()
                 } else {
                     self.scan_string('\'')
@@ -177,13 +177,15 @@ impl<'src> Lexer<'src> {
     }
     fn scan_block_comment(&mut self) -> TokenKind {
         while !self.is_at_end() {
-            if self.peek() == '\'' && self.peek_next() == Some('\'') {
-                if self.current + 2 < self.chars.len() && self.chars[self.current + 2] == '\'' {
-                    self.advance(); 
-                    self.advance(); 
-                    self.advance(); 
-                    return self.scan_token().map(|t| t.kind).unwrap_or(TokenKind::Eof);
-                }
+            if self.peek() == '\''
+                && self.peek_next() == Some('\'')
+                && self.current + 2 < self.chars.len()
+                && self.chars[self.current + 2] == '\''
+            {
+                self.advance();
+                self.advance();
+                self.advance();
+                return self.scan_token().map(|t| t.kind).unwrap_or(TokenKind::Eof);
             }
             if self.peek() == '\n' {
                 self.line += 1;
@@ -212,7 +214,10 @@ impl<'src> Lexer<'src> {
                     '\'' => value.push('\''),
                     '0' => value.push('\0'),
                     _ => {
-                        return TokenKind::Error(format!("Invalid escape sequence '\\{}'", escaped));
+                        return TokenKind::Error(format!(
+                            "Invalid escape sequence '\\{}'",
+                            escaped
+                        ));
                     }
                 }
             } else {
@@ -222,7 +227,7 @@ impl<'src> Lexer<'src> {
         if self.is_at_end() {
             return TokenKind::Error("Unterminated string".into());
         }
-        self.advance(); 
+        self.advance();
         TokenKind::String(value)
     }
     fn scan_raw_string(&mut self) -> TokenKind {
@@ -238,7 +243,7 @@ impl<'src> Lexer<'src> {
         if self.is_at_end() {
             return TokenKind::Error("Unterminated raw string".into());
         }
-        self.advance(); 
+        self.advance();
         TokenKind::String(value)
     }
     fn scan_number(&mut self, first: char) -> TokenKind {
@@ -265,7 +270,7 @@ impl<'src> Lexer<'src> {
         if !self.is_at_end() && self.peek() == '.' {
             if let Some(next) = self.peek_next() {
                 if next.is_ascii_digit() {
-                    self.advance(); 
+                    self.advance();
                     while !self.is_at_end() && self.peek().is_ascii_digit() {
                         self.advance();
                     }
@@ -350,7 +355,11 @@ impl<'src> Lexer<'src> {
         self.current >= self.chars.len()
     }
     fn peek(&self) -> char {
-        if self.is_at_end() { '\0' } else { self.chars[self.current] }
+        if self.is_at_end() {
+            '\0'
+        } else {
+            self.chars[self.current]
+        }
     }
     fn peek_next(&self) -> Option<char> {
         if self.current + 1 >= self.chars.len() {

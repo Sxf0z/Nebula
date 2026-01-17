@@ -2,8 +2,8 @@ pub mod ast;
 mod expr;
 mod stmt;
 mod types;
-use crate::lexer::{Token, TokenKind};
 use crate::error::{NebulaError, NebulaResult};
+use crate::lexer::{Token, TokenKind};
 pub use ast::*;
 pub struct Parser {
     tokens: Vec<Token>,
@@ -44,7 +44,7 @@ impl Parser {
         self.expect(TokenKind::LeftParen)?;
         let params = self.parse_params()?;
         self.expect(TokenKind::RightParen)?;
-        let return_type = None; 
+        let return_type = None;
         let body = if self.match_token(&TokenKind::Assign) {
             FunctionBody::Expression(self.parse_expression()?)
         } else {
@@ -66,7 +66,8 @@ impl Parser {
         let mut params = Vec::new();
         if !self.check(&TokenKind::RightParen) {
             loop {
-                let variadic = self.match_token(&TokenKind::DotDot) && self.match_token(&TokenKind::Dot);
+                let variadic =
+                    self.match_token(&TokenKind::DotDot) && self.match_token(&TokenKind::Dot);
                 let name = self.expect_identifier()?;
                 let ty = if self.match_token(&TokenKind::Colon) {
                     Some(self.parse_type()?)
@@ -78,7 +79,12 @@ impl Parser {
                 } else {
                     None
                 };
-                params.push(Param { name, ty, default, variadic });
+                params.push(Param {
+                    name,
+                    ty,
+                    default,
+                    variadic,
+                });
                 if !self.match_token(&TokenKind::Comma) {
                     break;
                 }
@@ -99,12 +105,19 @@ impl Parser {
             let field_name = self.expect_identifier()?;
             self.expect(TokenKind::Colon)?;
             let field_type = self.parse_type()?;
-            fields.push(Field { name: field_name, ty: field_type });
+            fields.push(Field {
+                name: field_name,
+                ty: field_type,
+            });
             self.match_token(&TokenKind::Comma);
             self.skip_newlines();
         }
         self.expect(TokenKind::RightBrace)?;
-        Ok(Struct { name, fields, span: start_span })
+        Ok(Struct {
+            name,
+            fields,
+            span: start_span,
+        })
     }
     fn parse_enum(&mut self) -> NebulaResult<Enum> {
         let start_span = self.expect(TokenKind::Enum)?.span;
@@ -121,19 +134,30 @@ impl Parser {
             self.skip_newlines();
         }
         self.expect(TokenKind::RightBrace)?;
-        Ok(Enum { name, variants, span: start_span })
+        Ok(Enum {
+            name,
+            variants,
+            span: start_span,
+        })
     }
     fn parse_type_alias(&mut self) -> NebulaResult<TypeAlias> {
         let start_span = self.expect(TokenKind::Type)?.span;
         let name = self.expect_identifier()?;
         self.expect(TokenKind::Assign)?;
         let ty = self.parse_type()?;
-        Ok(TypeAlias { name, ty, span: start_span })
+        Ok(TypeAlias {
+            name,
+            ty,
+            span: start_span,
+        })
     }
     fn parse_module(&mut self) -> NebulaResult<Module> {
         let start_span = self.expect(TokenKind::Mod)?.span;
         let name = self.expect_identifier()?;
-        Ok(Module { name, span: start_span })
+        Ok(Module {
+            name,
+            span: start_span,
+        })
     }
     fn parse_use(&mut self) -> NebulaResult<Use> {
         let start_span = self.expect(TokenKind::Use)?.span;
@@ -143,17 +167,21 @@ impl Parser {
         } else {
             None
         };
-        Ok(Use { path, alias, span: start_span })
+        Ok(Use {
+            path,
+            alias,
+            span: start_span,
+        })
     }
     fn parse_block_until_end(&mut self) -> NebulaResult<Vec<Stmt>> {
         let mut statements = Vec::new();
         self.skip_newlines();
-        while !self.check(&TokenKind::End) && 
-              !self.check(&TokenKind::Elsif) &&
-              !self.check(&TokenKind::Else) &&
-              !self.check(&TokenKind::Catch) &&
-              !self.check(&TokenKind::Finally) &&
-              !self.is_at_end() 
+        while !self.check(&TokenKind::End)
+            && !self.check(&TokenKind::Elsif)
+            && !self.check(&TokenKind::Else)
+            && !self.check(&TokenKind::Catch)
+            && !self.check(&TokenKind::Finally)
+            && !self.is_at_end()
         {
             statements.push(self.parse_statement()?);
             self.skip_newlines();
@@ -184,10 +212,17 @@ impl Parser {
                 let expr = self.parse_expression()?;
                 if self.match_token(&TokenKind::Assign) {
                     let value = self.parse_expression()?;
-                    Ok(Stmt::Assignment { target: expr, value })
+                    Ok(Stmt::Assignment {
+                        target: expr,
+                        value,
+                    })
                 } else if let Some(op) = self.match_compound_assign() {
                     let value = self.parse_expression()?;
-                    Ok(Stmt::CompoundAssignment { target: expr, op, value })
+                    Ok(Stmt::CompoundAssignment {
+                        target: expr,
+                        op,
+                        value,
+                    })
                 } else {
                     Ok(Stmt::Expression(expr))
                 }
@@ -196,11 +231,23 @@ impl Parser {
     }
     fn match_compound_assign(&mut self) -> Option<CompoundOp> {
         match &self.peek().kind {
-            TokenKind::PlusAssign => { self.advance(); Some(CompoundOp::Add) }
-            TokenKind::MinusAssign => { self.advance(); Some(CompoundOp::Sub) }
-            TokenKind::StarAssign => { self.advance(); Some(CompoundOp::Mul) }
-            TokenKind::SlashAssign => { self.advance(); Some(CompoundOp::Div) }
-            _ => None
+            TokenKind::PlusAssign => {
+                self.advance();
+                Some(CompoundOp::Add)
+            }
+            TokenKind::MinusAssign => {
+                self.advance();
+                Some(CompoundOp::Sub)
+            }
+            TokenKind::StarAssign => {
+                self.advance();
+                Some(CompoundOp::Mul)
+            }
+            TokenKind::SlashAssign => {
+                self.advance();
+                Some(CompoundOp::Div)
+            }
+            _ => None,
         }
     }
     fn parse_const(&mut self) -> NebulaResult<Stmt> {
@@ -263,7 +310,13 @@ impl Parser {
         self.expect(TokenKind::Do)?;
         let body = self.parse_block_until_end()?;
         self.expect(TokenKind::End)?;
-        Ok(Stmt::For { var, start, end, step, body })
+        Ok(Stmt::For {
+            var,
+            start,
+            end,
+            step,
+            body,
+        })
     }
     fn parse_each(&mut self) -> NebulaResult<Stmt> {
         self.expect(TokenKind::Each)?;
@@ -273,7 +326,11 @@ impl Parser {
         self.expect(TokenKind::Do)?;
         let body = self.parse_block_until_end()?;
         self.expect(TokenKind::End)?;
-        Ok(Stmt::Each { var, iterator, body })
+        Ok(Stmt::Each {
+            var,
+            iterator,
+            body,
+        })
     }
     fn parse_match(&mut self) -> NebulaResult<Stmt> {
         self.expect(TokenKind::Match)?;
@@ -328,7 +385,7 @@ impl Parser {
             _ => Err(NebulaError::Parse {
                 message: "Expected pattern".to_string(),
                 span: self.peek().span,
-            })
+            }),
         }
     }
     fn parse_try(&mut self) -> NebulaResult<Stmt> {
@@ -350,7 +407,12 @@ impl Parser {
             None
         };
         self.expect(TokenKind::End)?;
-        Ok(Stmt::Try { try_block, catch_var, catch_block, finally_block })
+        Ok(Stmt::Try {
+            try_block,
+            catch_var,
+            catch_block,
+            finally_block,
+        })
     }
     fn parse_return(&mut self) -> NebulaResult<Stmt> {
         if self.check(&TokenKind::Arrow) {
@@ -358,11 +420,12 @@ impl Parser {
         } else {
             self.expect(TokenKind::Give)?;
         }
-        let value = if self.check(&TokenKind::Newline) || self.check(&TokenKind::End) || self.is_at_end() {
-            None
-        } else {
-            Some(self.parse_expression()?)
-        };
+        let value =
+            if self.check(&TokenKind::Newline) || self.check(&TokenKind::End) || self.is_at_end() {
+                None
+            } else {
+                Some(self.parse_expression()?)
+            };
         Ok(Stmt::Return(value))
     }
     pub fn parse_expression(&mut self) -> NebulaResult<Expr> {
@@ -555,7 +618,7 @@ impl Parser {
     fn parse_power(&mut self) -> NebulaResult<Expr> {
         let left = self.parse_unary()?;
         if self.match_token(&TokenKind::Caret) {
-            let right = self.parse_power()?; 
+            let right = self.parse_power()?;
             return Ok(Expr::Binary {
                 left: Box::new(left),
                 op: BinaryOp::Pow,
@@ -681,14 +744,18 @@ impl Parser {
         if self.current + 1 >= self.tokens.len() {
             false
         } else {
-            std::mem::discriminant(&self.tokens[self.current + 1].kind) == std::mem::discriminant(kind)
+            std::mem::discriminant(&self.tokens[self.current + 1].kind)
+                == std::mem::discriminant(kind)
         }
     }
     fn is_next_identifier(&self) -> bool {
         if self.current + 1 >= self.tokens.len() {
             false
         } else {
-            matches!(&self.tokens[self.current + 1].kind, TokenKind::Identifier(_))
+            matches!(
+                &self.tokens[self.current + 1].kind,
+                TokenKind::Identifier(_)
+            )
         }
     }
     fn parse_args(&mut self) -> NebulaResult<Vec<Expr>> {
@@ -731,7 +798,13 @@ impl Parser {
             }
             TokenKind::Identifier(name) => {
                 self.advance();
-                if self.check(&TokenKind::LeftParen) && name.chars().next().map(|c| c.is_uppercase()).unwrap_or(false) {
+                if self.check(&TokenKind::LeftParen)
+                    && name
+                        .chars()
+                        .next()
+                        .map(|c| c.is_uppercase())
+                        .unwrap_or(false)
+                {
                     self.advance();
                     let args = self.parse_args()?;
                     self.expect(TokenKind::RightParen)?;
@@ -788,14 +861,20 @@ impl Parser {
                     None
                 };
                 self.expect(TokenKind::RightParen)?;
-                Ok(Expr::Assert { condition: Box::new(condition), message })
+                Ok(Expr::Assert {
+                    condition: Box::new(condition),
+                    message,
+                })
             }
             TokenKind::Nb | TokenKind::Wrd | TokenKind::Int | TokenKind::Fl => {
                 let ty = self.parse_type()?;
                 self.expect(TokenKind::LeftParen)?;
                 let value = self.parse_expression()?;
                 self.expect(TokenKind::RightParen)?;
-                Ok(Expr::Cast { ty, value: Box::new(value) })
+                Ok(Expr::Cast {
+                    ty,
+                    value: Box::new(value),
+                })
             }
             TokenKind::LeftParen => {
                 self.advance();
@@ -810,16 +889,20 @@ impl Parser {
                     }
                     self.expect(TokenKind::RightParen)?;
                     if self.match_token(&TokenKind::FatArrow) {
-                        let params: Result<Vec<_>, _> = elements.iter().map(|e| {
-                            if let Expr::Variable(name) = e {
-                                Ok(name.clone())
-                            } else {
-                                Err(NebulaError::Parse {
-                                    message: "Lambda parameters must be identifiers".to_string(),
-                                    span: self.peek().span,
-                                })
-                            }
-                        }).collect();
+                        let params: Result<Vec<_>, _> = elements
+                            .iter()
+                            .map(|e| {
+                                if let Expr::Variable(name) = e {
+                                    Ok(name.clone())
+                                } else {
+                                    Err(NebulaError::Parse {
+                                        message: "Lambda parameters must be identifiers"
+                                            .to_string(),
+                                        span: self.peek().span,
+                                    })
+                                }
+                            })
+                            .collect();
                         let body = self.parse_expression()?;
                         return Ok(Expr::Lambda {
                             params: params?,
@@ -838,7 +921,7 @@ impl Parser {
                         });
                     }
                 }
-                Ok(first) 
+                Ok(first)
             }
             _ => Err(NebulaError::Parse {
                 message: format!("Unexpected token: {:?}", self.peek().kind),
@@ -848,15 +931,42 @@ impl Parser {
     }
     pub fn parse_type(&mut self) -> NebulaResult<Type> {
         let base_type = match &self.peek().kind {
-            TokenKind::Nb => { self.advance(); Type::Nb }
-            TokenKind::Int => { self.advance(); Type::Int }
-            TokenKind::Fl => { self.advance(); Type::Fl }
-            TokenKind::Wrd => { self.advance(); Type::Wrd }
-            TokenKind::By => { self.advance(); Type::By }
-            TokenKind::Chr => { self.advance(); Type::Chr }
-            TokenKind::Any => { self.advance(); Type::Any }
-            TokenKind::Void => { self.advance(); Type::Void }
-            TokenKind::Empty => { self.advance(); Type::Nil }
+            TokenKind::Nb => {
+                self.advance();
+                Type::Nb
+            }
+            TokenKind::Int => {
+                self.advance();
+                Type::Int
+            }
+            TokenKind::Fl => {
+                self.advance();
+                Type::Fl
+            }
+            TokenKind::Wrd => {
+                self.advance();
+                Type::Wrd
+            }
+            TokenKind::By => {
+                self.advance();
+                Type::By
+            }
+            TokenKind::Chr => {
+                self.advance();
+                Type::Chr
+            }
+            TokenKind::Any => {
+                self.advance();
+                Type::Any
+            }
+            TokenKind::Void => {
+                self.advance();
+                Type::Void
+            }
+            TokenKind::Empty => {
+                self.advance();
+                Type::Nil
+            }
             TokenKind::Lst => {
                 self.advance();
                 Type::Lst(None)
@@ -878,10 +988,12 @@ impl Parser {
                 self.advance();
                 Type::Named(name)
             }
-            _ => return Err(NebulaError::Parse {
-                message: format!("Expected type, got {:?}", self.peek().kind),
-                span: self.peek().span,
-            }),
+            _ => {
+                return Err(NebulaError::Parse {
+                    message: format!("Expected type, got {:?}", self.peek().kind),
+                    span: self.peek().span,
+                })
+            }
         };
         if self.match_token(&TokenKind::Question) {
             return Ok(Type::Optional(Box::new(base_type)));
@@ -890,7 +1002,9 @@ impl Parser {
     }
     fn peek(&self) -> &Token {
         self.tokens.get(self.current).unwrap_or_else(|| {
-            self.tokens.last().expect("Token stream should not be empty")
+            self.tokens
+                .last()
+                .expect("Token stream should not be empty")
         })
     }
     fn is_at_end(&self) -> bool {

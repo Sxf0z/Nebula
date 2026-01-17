@@ -1,28 +1,28 @@
-use thiserror::Error;
 use crate::lexer::Span;
+use thiserror::Error;
 pub type NebulaResult<T> = Result<T, NebulaError>;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ErrorCode {
-    E001, 
-    E002, 
-    E003, 
-    E004, 
-    E010, 
-    E011, 
-    E012, 
-    E013, 
-    E020, 
-    E021, 
-    E030, 
-    E031, 
-    E032, 
-    E040, 
-    E050, 
-    E060, 
-    E061, 
-    E070, 
-    E071, 
-    E080, 
+    E001,
+    E002,
+    E003,
+    E004,
+    E010,
+    E011,
+    E012,
+    E013,
+    E020,
+    E021,
+    E030,
+    E031,
+    E032,
+    E040,
+    E050,
+    E060,
+    E061,
+    E070,
+    E071,
+    E080,
 }
 impl ErrorCode {
     pub fn as_str(&self) -> &'static str {
@@ -77,7 +77,7 @@ impl ErrorCode {
 #[derive(Error, Debug, Clone)]
 pub enum NebulaError {
     #[error("[{code}] {msg}")]
-    Coded { 
+    Coded {
         code: ErrorCode,
         msg: String,
         span: Option<Span>,
@@ -109,7 +109,11 @@ impl NebulaError {
         } else {
             format!("{}: {}", code.message(), detail)
         };
-        NebulaError::Coded { code, msg, span: None }
+        NebulaError::Coded {
+            code,
+            msg,
+            span: None,
+        }
     }
     pub fn coded_at(code: ErrorCode, detail: impl Into<String>, span: Span) -> Self {
         let detail = detail.into();
@@ -118,7 +122,11 @@ impl NebulaError {
         } else {
             format!("{}: {}", code.message(), detail)
         };
-        NebulaError::Coded { code, msg, span: Some(span) }
+        NebulaError::Coded {
+            code,
+            msg,
+            span: Some(span),
+        }
     }
     pub fn span(&self) -> Option<&Span> {
         match self {
@@ -137,8 +145,9 @@ impl NebulaError {
             NebulaError::Type { message, .. } => message.clone(),
             NebulaError::Runtime { message } => message.clone(),
             NebulaError::UndefinedVariable { name } => format!("variable not found: {}", name),
-            NebulaError::IndexOutOfBounds { index, length } => 
-                format!("out of bounds: {} (len {})", index, length),
+            NebulaError::IndexOutOfBounds { index, length } => {
+                format!("out of bounds: {} (len {})", index, length)
+            }
             NebulaError::DivisionByZero => "divide by zero".to_string(),
             NebulaError::InvalidOperation { message } => message.clone(),
             NebulaError::Io { message } => message.clone(),

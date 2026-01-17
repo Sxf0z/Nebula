@@ -31,9 +31,13 @@ fn track_dealloc() {
     DEALLOC_COUNT.fetch_add(1, Ordering::Relaxed);
 }
 #[cfg(not(debug_assertions))]
-pub fn heap_stats() -> (usize, usize) { (0, 0) }
+pub fn heap_stats() -> (usize, usize) {
+    (0, 0)
+}
 #[cfg(not(debug_assertions))]
-pub fn check_leaks() -> usize { 0 }
+pub fn check_leaks() -> usize {
+    0
+}
 #[cfg(not(debug_assertions))]
 pub fn reset_stats() {}
 #[cfg(not(debug_assertions))]
@@ -75,7 +79,10 @@ impl NanBoxed {
     #[inline(always)]
     pub fn ptr(p: *mut HeapObject) -> Self {
         let addr = p as u64;
-        debug_assert!(addr & !PAYLOAD_MASK == 0, "pointer too large for NaN-boxing");
+        debug_assert!(
+            addr & !PAYLOAD_MASK == 0,
+            "pointer too large for NaN-boxing"
+        );
         Self(QNAN | TAG_PTR | addr)
     }
     #[inline(always)]
@@ -84,8 +91,7 @@ impl NanBoxed {
     }
     #[inline(always)]
     pub fn is_integer(self) -> bool {
-        (self.0 & (QNAN | TAG_INT)) == (QNAN | TAG_INT) && 
-        (self.0 & TAG_PTR) != TAG_PTR  
+        (self.0 & (QNAN | TAG_INT)) == (QNAN | TAG_INT) && (self.0 & TAG_PTR) != TAG_PTR
     }
     #[inline(always)]
     pub fn is_nil(self) -> bool {
@@ -133,7 +139,7 @@ impl NanBoxed {
             TRUE => true,
             _ if self.is_number() => self.as_number() != 0.0,
             _ if self.is_integer() => self.as_integer() != 0,
-            _ => true, 
+            _ => true,
         }
     }
     #[inline(always)]
@@ -223,7 +229,9 @@ impl fmt::Display for HeapObject {
             HeapData::List(items) => {
                 write!(f, "lst(")?;
                 for (i, item) in items.iter().enumerate() {
-                    if i > 0 { write!(f, ", ")?; }
+                    if i > 0 {
+                        write!(f, ", ")?;
+                    }
                     write!(f, "{}", item)?;
                 }
                 write!(f, ")")
@@ -231,7 +239,9 @@ impl fmt::Display for HeapObject {
             HeapData::Map(map) => {
                 write!(f, "map(")?;
                 for (i, (k, v)) in map.iter().enumerate() {
-                    if i > 0 { write!(f, ", ")?; }
+                    if i > 0 {
+                        write!(f, ", ")?;
+                    }
                     write!(f, "\"{}\": {}", k, v)?;
                 }
                 write!(f, ")")
@@ -268,6 +278,7 @@ impl HeapObject {
         });
         Box::into_raw(obj)
     }
+    #[allow(clippy::missing_safety_doc)]
     pub unsafe fn free(ptr: *mut Self) {
         if !ptr.is_null() {
             track_dealloc();
@@ -352,6 +363,8 @@ mod tests {
         assert!(v.is_truthy());
         let obj = unsafe { &*v.as_ptr() };
         assert_eq!(obj.tag, ObjectTag::String);
-        unsafe { drop(Box::from_raw(ptr)); }
+        unsafe {
+            drop(Box::from_raw(ptr));
+        }
     }
 }

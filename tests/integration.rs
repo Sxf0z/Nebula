@@ -1,18 +1,21 @@
 //! Integration tests for SpecterScript VM
-//! 
+//!
 //! Tests verify that programs compile and run without crashing.
 //! Return value tests use variable reads which do return values.
 
-use specterscript::{Lexer, Parser, Compiler, VM};
+use specterscript::{Compiler, Lexer, Parser, VM};
 
 /// Run code through VM - returns Ok if no crash/error
 fn run(code: &str) -> Result<(), String> {
     let tokens: Vec<_> = Lexer::new(code).collect();
-    let program = Parser::new(tokens).parse_program().map_err(|e| e.message())?;
+    let program = Parser::new(tokens)
+        .parse_program()
+        .map_err(|e| e.message())?;
     let mut compiler = Compiler::new();
     let chunk = compiler.compile(&program).map_err(|e| e.message())?;
     let mut vm = VM::new();
-    vm.run_with_functions(&chunk, compiler.global_names(), compiler.functions()).map_err(|e| e.message())?;
+    vm.run_with_functions(&chunk, compiler.global_names(), compiler.functions())
+        .map_err(|e| e.message())?;
     Ok(())
 }
 
@@ -144,16 +147,21 @@ fn test_heap_stats_available() {
     // Note: Due to test parallelism, we can't guarantee zero counts
     let (alloc, dealloc) = specterscript::vm::heap_stats();
     // Just verify these return reasonable values (not panicking)
-    assert!(alloc >= dealloc, "alloc {} should be >= dealloc {}", alloc, dealloc);
+    assert!(
+        alloc >= dealloc,
+        "alloc {} should be >= dealloc {}",
+        alloc,
+        dealloc
+    );
 }
 
 #[test]
 fn test_string_allocation_tracked() {
     specterscript::vm::reset_stats();
-    
-    // Run code that creates a string 
+
+    // Run code that creates a string
     run("fb msg = \"test\"").unwrap();
-    
+
     let (alloc, _) = specterscript::vm::heap_stats();
     // At least one string should be allocated (the string constant)
     assert!(alloc >= 1, "Expected at least 1 allocation, got {}", alloc);

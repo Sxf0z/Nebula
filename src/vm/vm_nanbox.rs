@@ -1,14 +1,13 @@
-use crate::error::{NebulaError, NebulaResult, ErrorCode};
-use super::{Chunk, OpCode, NanBoxed, HeapObject, CompiledFunction};
+use super::{Chunk, CompiledFunction, HeapObject, NanBoxed, OpCode};
+use crate::error::{ErrorCode, NebulaError, NebulaResult};
 const STACK_SIZE: usize = 256;
 const MAX_GLOBALS: usize = 256;
 const MAX_FRAMES: usize = 64;
 const MAX_ITERATIONS: usize = 1_000_000;
 const BUILTIN_COUNT: usize = 21;
 pub const BUILTIN_NAMES: [&str; BUILTIN_COUNT] = [
-    "log", "typeof", "sqrt", "abs", "len", "floor", "ceil", 
-    "round", "pow", "sin", "cos", "tan", "exp", "ln", "get", 
-    "rnd", "dbg", "now", "sleep", "str", "num"
+    "log", "typeof", "sqrt", "abs", "len", "floor", "ceil", "round", "pow", "sin", "cos", "tan",
+    "exp", "ln", "get", "rnd", "dbg", "now", "sleep", "str", "num",
 ];
 #[derive(Clone)]
 #[allow(dead_code)]
@@ -47,10 +46,10 @@ impl VMNanBox {
         self.run_with_functions(chunk, global_names, &[])
     }
     pub fn run_with_functions(
-        &mut self, 
-        chunk: &Chunk, 
+        &mut self,
+        chunk: &Chunk,
         global_names: &[String],
-        functions: &[CompiledFunction]
+        functions: &[CompiledFunction],
     ) -> NebulaResult<NanBoxed> {
         self.ip = 0;
         self.frame_base = 0;
@@ -65,7 +64,11 @@ impl VMNanBox {
         });
         self.run_main_loop(chunk, functions)
     }
-    fn run_main_loop(&mut self, chunk: &Chunk, functions: &[CompiledFunction]) -> NebulaResult<NanBoxed> {
+    fn run_main_loop(
+        &mut self,
+        chunk: &Chunk,
+        functions: &[CompiledFunction],
+    ) -> NebulaResult<NanBoxed> {
         loop {
             if self.ip >= chunk.code().len() {
                 break;
@@ -73,7 +76,12 @@ impl VMNanBox {
             let byte = chunk.read_byte(self.ip);
             let op = match OpCode::from_byte(byte) {
                 Some(op) => op,
-                None => return Err(NebulaError::coded(ErrorCode::E004, format!("invalid opcode {}", byte))),
+                None => {
+                    return Err(NebulaError::coded(
+                        ErrorCode::E004,
+                        format!("invalid opcode {}", byte),
+                    ))
+                }
             };
             self.ip += 1;
             match op {
@@ -87,7 +95,9 @@ impl VMNanBox {
                 OpCode::PushNil => self.push(NanBoxed::nil())?,
                 OpCode::PushTrue => self.push(NanBoxed::boolean(true))?,
                 OpCode::PushFalse => self.push(NanBoxed::boolean(false))?,
-                OpCode::Pop => { self.pop()?; }
+                OpCode::Pop => {
+                    self.pop()?;
+                }
                 OpCode::Dup => {
                     let value = self.peek(0)?;
                     self.push(value)?;
@@ -108,7 +118,10 @@ impl VMNanBox {
                     let idx = chunk.read_byte(self.ip) as usize;
                     self.ip += 1;
                     if idx >= self.globals.len() {
-                        return Err(NebulaError::coded(ErrorCode::E013, format!("global index {} out of bounds", idx)));
+                        return Err(NebulaError::coded(
+                            ErrorCode::E013,
+                            format!("global index {} out of bounds", idx),
+                        ));
                     }
                     let value = self.globals[idx];
                     self.push(value)?;
@@ -117,7 +130,10 @@ impl VMNanBox {
                     let idx = chunk.read_byte(self.ip) as usize;
                     self.ip += 1;
                     if idx >= self.globals.len() {
-                        return Err(NebulaError::coded(ErrorCode::E013, format!("global index {} out of bounds", idx)));
+                        return Err(NebulaError::coded(
+                            ErrorCode::E013,
+                            format!("global index {} out of bounds", idx),
+                        ));
                     }
                     let value = self.peek(0)?;
                     self.globals[idx] = value;
@@ -126,7 +142,10 @@ impl VMNanBox {
                     let idx = chunk.read_byte(self.ip) as usize;
                     self.ip += 1;
                     if idx >= self.globals.len() {
-                        return Err(NebulaError::coded(ErrorCode::E013, format!("global index {} out of bounds", idx)));
+                        return Err(NebulaError::coded(
+                            ErrorCode::E013,
+                            format!("global index {} out of bounds", idx),
+                        ));
                     }
                     let value = self.pop()?;
                     self.globals[idx] = value;
@@ -239,14 +258,11 @@ impl VMNanBox {
                     let a = self.pop()?;
                     if a.is_number() && b.is_number() {
                         self.push(NanBoxed::number(a.as_number() + b.as_number()))?;
-                    }
-                    else if a.is_integer() && b.is_integer() {
+                    } else if a.is_integer() && b.is_integer() {
                         self.push(NanBoxed::integer(a.as_integer() + b.as_integer()))?;
-                    }
-                    else if let (Some(na), Some(nb)) = (a.as_numeric(), b.as_numeric()) {
+                    } else if let (Some(na), Some(nb)) = (a.as_numeric(), b.as_numeric()) {
                         self.push(NanBoxed::number(na + nb))?;
-                    }
-                    else {
+                    } else {
                         return Err(NebulaError::coded(ErrorCode::E031, "add"));
                     }
                 }
@@ -279,8 +295,12 @@ impl VMNanBox {
                 OpCode::Div => {
                     let b = self.pop()?;
                     let a = self.pop()?;
-                    let nb = b.as_numeric().ok_or_else(|| NebulaError::coded(ErrorCode::E031, "div"))?;
-                    let na = a.as_numeric().ok_or_else(|| NebulaError::coded(ErrorCode::E031, "div"))?;
+                    let nb = b
+                        .as_numeric()
+                        .ok_or_else(|| NebulaError::coded(ErrorCode::E031, "div"))?;
+                    let na = a
+                        .as_numeric()
+                        .ok_or_else(|| NebulaError::coded(ErrorCode::E031, "div"))?;
                     if nb == 0.0 {
                         return Err(NebulaError::coded(ErrorCode::E040, ""));
                     }
@@ -438,14 +458,17 @@ impl VMNanBox {
                             super::HeapData::Function(func) => {
                                 if argc != func.arity as usize {
                                     return Err(NebulaError::coded(
-                                        ErrorCode::E012, 
-                                        format!("{}: expected {} args, got {}", func.name, func.arity, argc)
+                                        ErrorCode::E012,
+                                        format!(
+                                            "{}: expected {} args, got {}",
+                                            func.name, func.arity, argc
+                                        ),
                                     ));
                                 }
                                 if self.frames.len() >= MAX_FRAMES {
                                     return Err(NebulaError::coded(
-                                        ErrorCode::E071, 
-                                        format!("stack overflow: max {} frames", MAX_FRAMES)
+                                        ErrorCode::E071,
+                                        format!("stack overflow: max {} frames", MAX_FRAMES),
                                     ));
                                 }
                                 let base = self.stack.len() - argc;
@@ -489,11 +512,17 @@ impl VMNanBox {
                         let ptr = HeapObject::new_function(func);
                         self.push(NanBoxed::ptr(ptr))?;
                     } else {
-                        return Err(NebulaError::coded(ErrorCode::E004, format!("invalid function index {}", func_idx)));
+                        return Err(NebulaError::coded(
+                            ErrorCode::E004,
+                            format!("invalid function index {}", func_idx),
+                        ));
                     }
                 }
                 _ => {
-                    return Err(NebulaError::coded(ErrorCode::E004, format!("unhandled opcode {:?}", op)));
+                    return Err(NebulaError::coded(
+                        ErrorCode::E004,
+                        format!("unhandled opcode {:?}", op),
+                    ));
                 }
             }
         }
@@ -511,7 +540,12 @@ impl VMNanBox {
             let byte = chunk.read_byte(self.ip);
             let op = match OpCode::from_byte(byte) {
                 Some(op) => op,
-                None => return Err(NebulaError::coded(ErrorCode::E004, format!("invalid opcode {}", byte))),
+                None => {
+                    return Err(NebulaError::coded(
+                        ErrorCode::E004,
+                        format!("invalid opcode {}", byte),
+                    ))
+                }
             };
             self.ip += 1;
             match op {
@@ -532,8 +566,13 @@ impl VMNanBox {
                 OpCode::PushNil => self.push(NanBoxed::nil())?,
                 OpCode::PushTrue => self.push(NanBoxed::boolean(true))?,
                 OpCode::PushFalse => self.push(NanBoxed::boolean(false))?,
-                OpCode::Pop => { self.pop()?; }
-                OpCode::LoadLocal | OpCode::LoadLocal0 | OpCode::LoadLocal1 | OpCode::LoadLocal2 => {
+                OpCode::Pop => {
+                    self.pop()?;
+                }
+                OpCode::LoadLocal
+                | OpCode::LoadLocal0
+                | OpCode::LoadLocal1
+                | OpCode::LoadLocal2 => {
                     let slot = match op {
                         OpCode::LoadLocal => {
                             let s = chunk.read_byte(self.ip) as usize;
@@ -543,12 +582,15 @@ impl VMNanBox {
                         OpCode::LoadLocal0 => 0,
                         OpCode::LoadLocal1 => 1,
                         OpCode::LoadLocal2 => 2,
-                        _ => unreachable!()
+                        _ => unreachable!(),
                     };
                     let value = self.stack[self.frame_base + slot];
                     self.push(value)?;
                 }
-                OpCode::StoreLocal | OpCode::StoreLocal0 | OpCode::StoreLocal1 | OpCode::StoreLocal2 => {
+                OpCode::StoreLocal
+                | OpCode::StoreLocal0
+                | OpCode::StoreLocal1
+                | OpCode::StoreLocal2 => {
                     let slot = match op {
                         OpCode::StoreLocal => {
                             let s = chunk.read_byte(self.ip) as usize;
@@ -558,7 +600,7 @@ impl VMNanBox {
                         OpCode::StoreLocal0 => 0,
                         OpCode::StoreLocal1 => 1,
                         OpCode::StoreLocal2 => 2,
-                        _ => unreachable!()
+                        _ => unreachable!(),
                     };
                     let value = self.peek(0)?;
                     self.stack[self.frame_base + slot] = value;
@@ -642,7 +684,10 @@ impl VMNanBox {
                     let idx = chunk.read_byte(self.ip) as usize;
                     self.ip += 1;
                     if idx >= self.globals.len() {
-                        return Err(NebulaError::coded(ErrorCode::E013, format!("global index {} out of bounds", idx)));
+                        return Err(NebulaError::coded(
+                            ErrorCode::E013,
+                            format!("global index {} out of bounds", idx),
+                        ));
                     }
                     let value = self.globals[idx];
                     self.push(value)?;
@@ -684,19 +729,21 @@ impl VMNanBox {
                             }
                             self.push(result)?;
                         } else if let super::HeapData::Function(func) = &obj.data {
-                             if argc != func.arity as usize {
+                            if argc != func.arity as usize {
                                 return Err(NebulaError::coded(ErrorCode::E012, "arity mismatch"));
-                             }
-                             let saved_ip = self.ip;
-                             let saved_base = self.frame_base;
-                             let base = self.stack.len() - argc;
-                             self.ip = 0;
-                             self.frame_base = base;
-                             let result = self.execute_function_body(&func.chunk)?;
-                             self.ip = saved_ip;
-                             self.frame_base = saved_base;
-                             for _ in 0..=argc { self.pop()?; }
-                             self.push(result)?;
+                            }
+                            let saved_ip = self.ip;
+                            let saved_base = self.frame_base;
+                            let base = self.stack.len() - argc;
+                            self.ip = 0;
+                            self.frame_base = base;
+                            let result = self.execute_function_body(&func.chunk)?;
+                            self.ip = saved_ip;
+                            self.frame_base = saved_base;
+                            for _ in 0..=argc {
+                                self.pop()?;
+                            }
+                            self.push(result)?;
                         } else {
                             return Err(NebulaError::coded(ErrorCode::E011, "not callable in fn"));
                         }
@@ -721,10 +768,12 @@ impl VMNanBox {
                     self.ip += 2;
                     self.ip -= offset;
                 }
-                OpCode::CheckIterLimit => {
-                }
+                OpCode::CheckIterLimit => {}
                 _ => {
-                    return Err(NebulaError::coded(ErrorCode::E004, format!("unsupported opcode in function: {:?}", op)));
+                    return Err(NebulaError::coded(
+                        ErrorCode::E004,
+                        format!("unsupported opcode in function: {:?}", op),
+                    ));
                 }
             }
         }
@@ -740,7 +789,9 @@ impl VMNanBox {
     }
     #[inline(always)]
     fn pop(&mut self) -> NebulaResult<NanBoxed> {
-        self.stack.pop().ok_or_else(|| NebulaError::coded(ErrorCode::E013, "empty stack"))
+        self.stack
+            .pop()
+            .ok_or_else(|| NebulaError::coded(ErrorCode::E013, "empty stack"))
     }
     #[inline(always)]
     fn peek(&self, distance: usize) -> NebulaResult<NanBoxed> {
@@ -761,7 +812,7 @@ impl VMNanBox {
                 let ptr = HeapObject::new_string(s);
                 NanBoxed::ptr(ptr)
             }
-            _ => NanBoxed::nil(), 
+            _ => NanBoxed::nil(),
         }
     }
     fn values_equal(&self, a: NanBoxed, b: NanBoxed) -> bool {
@@ -775,7 +826,9 @@ impl VMNanBox {
             debug_assert!(!a.as_ptr().is_null() && !b.as_ptr().is_null());
             let obj_a = unsafe { &*a.as_ptr() };
             let obj_b = unsafe { &*b.as_ptr() };
-            if let (super::HeapData::String(sa), super::HeapData::String(sb)) = (&obj_a.data, &obj_b.data) {
+            if let (super::HeapData::String(sa), super::HeapData::String(sb)) =
+                (&obj_a.data, &obj_b.data)
+            {
                 return sa == sb;
             }
         }
@@ -822,7 +875,9 @@ impl VMNanBox {
                 if args.is_empty() {
                     return Err(NebulaError::coded(ErrorCode::E012, "sqrt"));
                 }
-                let n = args[0].as_numeric().ok_or_else(|| NebulaError::coded(ErrorCode::E031, "sqrt"))?;
+                let n = args[0]
+                    .as_numeric()
+                    .ok_or_else(|| NebulaError::coded(ErrorCode::E031, "sqrt"))?;
                 Ok(NanBoxed::number(n.sqrt()))
             }
             "abs" => {
@@ -855,34 +910,60 @@ impl VMNanBox {
                 }
             }
             "floor" => {
-                if args.is_empty() { return Err(NebulaError::coded(ErrorCode::E012, "floor")); }
-                let n = args[0].as_numeric().ok_or_else(|| NebulaError::coded(ErrorCode::E031, "floor"))?;
+                if args.is_empty() {
+                    return Err(NebulaError::coded(ErrorCode::E012, "floor"));
+                }
+                let n = args[0]
+                    .as_numeric()
+                    .ok_or_else(|| NebulaError::coded(ErrorCode::E031, "floor"))?;
                 Ok(NanBoxed::number(n.floor()))
             }
             "ceil" => {
-                if args.is_empty() { return Err(NebulaError::coded(ErrorCode::E012, "ceil")); }
-                let n = args[0].as_numeric().ok_or_else(|| NebulaError::coded(ErrorCode::E031, "ceil"))?;
+                if args.is_empty() {
+                    return Err(NebulaError::coded(ErrorCode::E012, "ceil"));
+                }
+                let n = args[0]
+                    .as_numeric()
+                    .ok_or_else(|| NebulaError::coded(ErrorCode::E031, "ceil"))?;
                 Ok(NanBoxed::number(n.ceil()))
             }
             "round" => {
-                if args.is_empty() { return Err(NebulaError::coded(ErrorCode::E012, "round")); }
-                let n = args[0].as_numeric().ok_or_else(|| NebulaError::coded(ErrorCode::E031, "round"))?;
+                if args.is_empty() {
+                    return Err(NebulaError::coded(ErrorCode::E012, "round"));
+                }
+                let n = args[0]
+                    .as_numeric()
+                    .ok_or_else(|| NebulaError::coded(ErrorCode::E031, "round"))?;
                 Ok(NanBoxed::number(n.round()))
             }
             "pow" => {
-                if args.len() < 2 { return Err(NebulaError::coded(ErrorCode::E012, "pow")); }
-                let base = args[0].as_numeric().ok_or_else(|| NebulaError::coded(ErrorCode::E031, "pow"))?;
-                let exp = args[1].as_numeric().ok_or_else(|| NebulaError::coded(ErrorCode::E031, "pow"))?;
+                if args.len() < 2 {
+                    return Err(NebulaError::coded(ErrorCode::E012, "pow"));
+                }
+                let base = args[0]
+                    .as_numeric()
+                    .ok_or_else(|| NebulaError::coded(ErrorCode::E031, "pow"))?;
+                let exp = args[1]
+                    .as_numeric()
+                    .ok_or_else(|| NebulaError::coded(ErrorCode::E031, "pow"))?;
                 Ok(NanBoxed::number(base.powf(exp)))
             }
             "sin" => {
-                if args.is_empty() { return Err(NebulaError::coded(ErrorCode::E012, "sin")); }
-                let n = args[0].as_numeric().ok_or_else(|| NebulaError::coded(ErrorCode::E031, "sin"))?;
+                if args.is_empty() {
+                    return Err(NebulaError::coded(ErrorCode::E012, "sin"));
+                }
+                let n = args[0]
+                    .as_numeric()
+                    .ok_or_else(|| NebulaError::coded(ErrorCode::E031, "sin"))?;
                 Ok(NanBoxed::number(n.sin()))
             }
             "cos" => {
-                if args.is_empty() { return Err(NebulaError::coded(ErrorCode::E012, "cos")); }
-                let n = args[0].as_numeric().ok_or_else(|| NebulaError::coded(ErrorCode::E031, "cos"))?;
+                if args.is_empty() {
+                    return Err(NebulaError::coded(ErrorCode::E012, "cos"));
+                }
+                let n = args[0]
+                    .as_numeric()
+                    .ok_or_else(|| NebulaError::coded(ErrorCode::E031, "cos"))?;
                 Ok(NanBoxed::number(n.cos()))
             }
             _ => Err(NebulaError::coded(ErrorCode::E010, name)),

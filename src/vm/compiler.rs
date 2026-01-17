@@ -1,7 +1,7 @@
-use crate::parser::ast::*;
-use crate::interp::Value;
-use crate::error::NebulaResult;
 use super::{Chunk, OpCode};
+use crate::error::NebulaResult;
+use crate::interp::Value;
+use crate::parser::ast::*;
 struct CompilerScope {
     locals: Vec<String>,
     scope_depth: usize,
@@ -21,8 +21,8 @@ impl CompilerScope {
     fn end_scope(&mut self) -> usize {
         self.scope_depth -= 1;
         let mut popped = 0;
-        while !self.local_depths.is_empty() 
-            && self.local_depths.last().copied().unwrap_or(0) > self.scope_depth 
+        while !self.local_depths.is_empty()
+            && self.local_depths.last().copied().unwrap_or(0) > self.scope_depth
         {
             self.locals.pop();
             self.local_depths.pop();
@@ -46,9 +46,8 @@ impl CompilerScope {
     }
 }
 const BUILTIN_NAMES: [&str; 21] = [
-    "log", "typeof", "sqrt", "abs", "len", "floor", "ceil", 
-    "round", "pow", "sin", "cos", "tan", "exp", "ln", "get", 
-    "rnd", "dbg", "now", "sleep", "str", "num"
+    "log", "typeof", "sqrt", "abs", "len", "floor", "ceil", "round", "pow", "sin", "cos", "tan",
+    "exp", "ln", "get", "rnd", "dbg", "now", "sleep", "str", "num",
 ];
 pub struct Compiler {
     chunk: Chunk,
@@ -87,7 +86,7 @@ impl Compiler {
         match item {
             Item::Statement(stmt) => self.compile_stmt(stmt),
             Item::Function(f) => self.compile_function_def(f),
-            _ => Ok(()), 
+            _ => Ok(()),
         }
     }
     fn compile_function_def(&mut self, f: &Function) -> NebulaResult<()> {
@@ -124,7 +123,7 @@ impl Compiler {
         Ok(())
     }
     fn compile_stmt(&mut self, stmt: &Stmt) -> NebulaResult<()> {
-        let line = 0; 
+        let line = 0;
         match stmt {
             Stmt::Var { name, value, .. } => {
                 self.compile_expr(value)?;
@@ -153,23 +152,28 @@ impl Compiler {
                 self.emit(OpCode::Pop, line);
                 Ok(())
             }
-            Stmt::If { condition, then_block, elif_branches, else_block } => {
+            Stmt::If {
+                condition,
+                then_block,
+                elif_branches,
+                else_block,
+            } => {
                 let mut end_jumps = Vec::new();
                 self.compile_expr(condition)?;
                 let then_jump = self.emit_jump(OpCode::JumpIfFalse, line);
-                self.emit(OpCode::Pop, line); 
+                self.emit(OpCode::Pop, line);
                 self.compile_block(then_block)?;
                 end_jumps.push(self.emit_jump(OpCode::Jump, line));
                 self.patch_jump(then_jump);
-                self.emit(OpCode::Pop, line); 
+                self.emit(OpCode::Pop, line);
                 for (elif_cond, elif_body) in elif_branches {
                     self.compile_expr(elif_cond)?;
                     let elif_jump = self.emit_jump(OpCode::JumpIfFalse, line);
-                    self.emit(OpCode::Pop, line); 
+                    self.emit(OpCode::Pop, line);
                     self.compile_block(elif_body)?;
                     end_jumps.push(self.emit_jump(OpCode::Jump, line));
                     self.patch_jump(elif_jump);
-                    self.emit(OpCode::Pop, line); 
+                    self.emit(OpCode::Pop, line);
                 }
                 if let Some(else_body) = else_block {
                     self.compile_block(else_body)?;
@@ -200,7 +204,13 @@ impl Compiler {
                 self.emit(OpCode::Return, line);
                 Ok(())
             }
-            Stmt::For { var, start, end, step, body } => {
+            Stmt::For {
+                var,
+                start,
+                end,
+                step,
+                body,
+            } => {
                 self.scope.begin_scope();
                 self.compile_expr(start)?;
                 let var_slot = self.scope.add_local(var.clone());
@@ -211,7 +221,7 @@ impl Compiler {
                 self.compile_expr(end)?;
                 self.emit(OpCode::Le, line);
                 let exit_jump = self.emit_jump(OpCode::JumpIfFalse, line);
-                self.emit(OpCode::Pop, line); 
+                self.emit(OpCode::Pop, line);
                 self.compile_block(body)?;
                 self.emit(OpCode::LoadLocal, line);
                 self.emit_byte(var_slot, line);
@@ -225,19 +235,23 @@ impl Compiler {
                 self.emit(OpCode::Add, line);
                 self.emit(OpCode::StoreLocal, line);
                 self.emit_byte(var_slot, line);
-                self.emit(OpCode::Pop, line); 
+                self.emit(OpCode::Pop, line);
                 self.emit_loop(loop_start, line);
                 self.patch_jump(exit_jump);
-                self.emit(OpCode::Pop, line); 
+                self.emit(OpCode::Pop, line);
                 self.scope.end_scope();
-                self.emit(OpCode::Pop, line); 
+                self.emit(OpCode::Pop, line);
                 Ok(())
             }
-            Stmt::Each { var, iterator, body } => {
+            Stmt::Each {
+                var,
+                iterator,
+                body,
+            } => {
                 self.scope.begin_scope();
                 self.compile_expr(iterator)?;
                 self.emit(OpCode::IterInit, line);
-                self.emit(OpCode::PushNil, line); 
+                self.emit(OpCode::PushNil, line);
                 let var_slot = self.scope.add_local(var.clone());
                 let loop_start = self.chunk.len();
                 self.emit(OpCode::CheckIterLimit, line);
@@ -252,7 +266,7 @@ impl Compiler {
                 for _ in 0..pops {
                     self.emit(OpCode::Pop, line);
                 }
-                self.emit(OpCode::Pop, line); 
+                self.emit(OpCode::Pop, line);
                 Ok(())
             }
             Stmt::Assignment { target, value } => {
@@ -281,21 +295,17 @@ impl Compiler {
                             }
                         }
                         self.emit(OpCode::Pop, line);
+                    } else if self.scope.scope_depth > 0 {
+                        self.scope.add_local(name.clone());
                     } else {
-                        if self.scope.scope_depth > 0 {
-                            self.scope.add_local(name.clone());
-                        } else {
-                            let idx = self.add_global(name.clone());
-                            self.emit(OpCode::DefineGlobal, line);
-                            self.emit_byte(idx, line);
-                        }
+                        let idx = self.add_global(name.clone());
+                        self.emit(OpCode::DefineGlobal, line);
+                        self.emit_byte(idx, line);
                     }
                 }
                 Ok(())
             }
-            _ => {
-                Ok(())
-            }
+            _ => Ok(()),
         }
     }
     fn compile_block(&mut self, stmts: &[Stmt]) -> NebulaResult<()> {
@@ -310,7 +320,7 @@ impl Compiler {
         Ok(())
     }
     fn compile_expr(&mut self, expr: &Expr) -> NebulaResult<()> {
-        let line = 0; 
+        let line = 0;
         match expr {
             Expr::Literal(lit) => {
                 match lit {
@@ -330,7 +340,14 @@ impl Compiler {
                         self.emit_byte(idx, line);
                     }
                     Literal::Bool(b) => {
-                        self.emit(if *b { OpCode::PushTrue } else { OpCode::PushFalse }, line);
+                        self.emit(
+                            if *b {
+                                OpCode::PushTrue
+                            } else {
+                                OpCode::PushFalse
+                            },
+                            line,
+                        );
                     }
                 }
                 Ok(())
@@ -398,9 +415,7 @@ impl Compiler {
                 self.emit_byte(items.len() as u8, line);
                 Ok(())
             }
-            _ => {
-                Ok(())
-            }
+            _ => Ok(()),
         }
     }
     fn emit(&mut self, op: OpCode, line: usize) {
@@ -458,7 +473,12 @@ impl Compiler {
         }
         self.add_global(name.to_string())
     }
-    fn try_fold_binary(&self, left: &Expr, op: &BinaryOp, right: &Expr) -> NebulaResult<Option<Value>> {
+    fn try_fold_binary(
+        &self,
+        left: &Expr,
+        op: &BinaryOp,
+        right: &Expr,
+    ) -> NebulaResult<Option<Value>> {
         let lval = match self.extract_number(left) {
             Some(v) => v,
             None => return Ok(None),
@@ -475,7 +495,7 @@ impl Compiler {
                 if rval == 0.0 {
                     return Err(crate::error::NebulaError::coded(
                         crate::error::ErrorCode::E040,
-                        "division by zero in constant expression"
+                        "division by zero in constant expression",
                     ));
                 }
                 lval / rval
@@ -484,13 +504,13 @@ impl Compiler {
                 if rval == 0.0 {
                     return Err(crate::error::NebulaError::coded(
                         crate::error::ErrorCode::E040,
-                        "modulo by zero in constant expression"
+                        "modulo by zero in constant expression",
                     ));
                 }
                 lval % rval
             }
             BinaryOp::Pow => lval.powf(rval),
-            _ => return Ok(None), 
+            _ => return Ok(None),
         };
         if result.fract() == 0.0 && result.abs() < (i64::MAX as f64) {
             Ok(Some(Value::Integer(result as i64)))
@@ -502,16 +522,18 @@ impl Compiler {
         match expr {
             Expr::Literal(Literal::Integer(n)) => Some(*n as f64),
             Expr::Literal(Literal::Float(f)) => Some(*f),
-            Expr::Binary { left, op, right } => {
-                self.try_fold_binary(left, op, right).ok()?.and_then(|v| match v {
+            Expr::Binary { left, op, right } => self
+                .try_fold_binary(left, op, right)
+                .ok()?
+                .and_then(|v| match v {
                     Value::Integer(n) => Some(n as f64),
                     Value::Number(f) => Some(f),
                     _ => None,
-                })
-            }
-            Expr::Unary { op: UnaryOp::Neg, operand } => {
-                self.extract_number(operand).map(|n| -n)
-            }
+                }),
+            Expr::Unary {
+                op: UnaryOp::Neg,
+                operand,
+            } => self.extract_number(operand).map(|n| -n),
             _ => None,
         }
     }

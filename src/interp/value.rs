@@ -1,30 +1,27 @@
+use crate::parser::ast::Param;
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fmt;
 use std::rc::Rc;
-use std::cell::RefCell;
-use crate::parser::ast::Param;
 #[derive(Debug, Clone)]
 pub enum Value {
-    Number(f64),        
-    Integer(i64),       
-    Float(f64),         
-    Bool(bool),         
-    String(String),     
-    Byte(u8),           
-    Char(char),         
-    Nil,                
-    List(Vec<Value>),                    
-    Map(HashMap<String, Value>),         
-    Tuple(Vec<Value>),                   
-    Set(Vec<Value>),                     
-    Range(i64, i64, bool),               
+    Number(f64),
+    Integer(i64),
+    Float(f64),
+    Bool(bool),
+    String(String),
+    Byte(u8),
+    Char(char),
+    Nil,
+    List(Vec<Value>),
+    Map(HashMap<String, Value>),
+    Tuple(Vec<Value>),
+    Set(Vec<Value>),
+    Range(i64, i64, bool),
     Function(Rc<FunctionValue>),
     Lambda(Rc<LambdaValue>),
     NativeFunction(NativeFn),
-    Struct {
-        name: String,
-        fields: Vec<Value>,
-    },
+    Struct { name: String, fields: Vec<Value> },
     Channel(Rc<RefCell<Vec<Value>>>),
 }
 #[derive(Debug, Clone)]
@@ -44,7 +41,7 @@ pub struct LambdaValue {
 #[derive(Clone)]
 pub struct NativeFn {
     pub name: String,
-    pub arity: Option<usize>,  
+    pub arity: Option<usize>,
     pub func: fn(&[Value]) -> Result<Value, String>,
 }
 impl fmt::Debug for NativeFn {
@@ -143,7 +140,9 @@ impl fmt::Display for Value {
             Value::List(arr) => {
                 write!(f, "lst(")?;
                 for (i, v) in arr.iter().enumerate() {
-                    if i > 0 { write!(f, ", ")?; }
+                    if i > 0 {
+                        write!(f, ", ")?;
+                    }
                     write!(f, "{}", v)?;
                 }
                 write!(f, ")")
@@ -151,7 +150,9 @@ impl fmt::Display for Value {
             Value::Map(m) => {
                 write!(f, "map(")?;
                 for (i, (k, v)) in m.iter().enumerate() {
-                    if i > 0 { write!(f, ", ")?; }
+                    if i > 0 {
+                        write!(f, ", ")?;
+                    }
                     write!(f, "\"{}\": {}", k, v)?;
                 }
                 write!(f, ")")
@@ -159,7 +160,9 @@ impl fmt::Display for Value {
             Value::Tuple(elements) => {
                 write!(f, "(")?;
                 for (i, v) in elements.iter().enumerate() {
-                    if i > 0 { write!(f, ", ")?; }
+                    if i > 0 {
+                        write!(f, ", ")?;
+                    }
                     write!(f, "{}", v)?;
                 }
                 write!(f, ")")
@@ -167,7 +170,9 @@ impl fmt::Display for Value {
             Value::Set(elements) => {
                 write!(f, "set(")?;
                 for (i, v) in elements.iter().enumerate() {
-                    if i > 0 { write!(f, ", ")?; }
+                    if i > 0 {
+                        write!(f, ", ")?;
+                    }
                     write!(f, "{}", v)?;
                 }
                 write!(f, ")")
@@ -185,7 +190,9 @@ impl fmt::Display for Value {
             Value::Struct { name, fields } => {
                 write!(f, "{}(", name)?;
                 for (i, v) in fields.iter().enumerate() {
-                    if i > 0 { write!(f, ", ")?; }
+                    if i > 0 {
+                        write!(f, ", ")?;
+                    }
                     write!(f, "{}", v)?;
                 }
                 write!(f, ")")

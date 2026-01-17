@@ -1,4 +1,4 @@
-mod token;
 mod scanner;
-pub use token::{Token, TokenKind, Span};
+mod token;
 pub use scanner::Lexer;
+pub use token::{Span, Token, TokenKind};

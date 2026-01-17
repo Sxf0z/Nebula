@@ -1,5 +1,5 @@
-use crate::interp::Value;
 use super::OpCode;
+use crate::interp::Value;
 #[derive(Debug, Clone)]
 pub struct Chunk {
     code: Vec<u8>,
@@ -43,6 +43,9 @@ impl Chunk {
     }
     pub fn len(&self) -> usize {
         self.code.len()
+    }
+    pub fn is_empty(&self) -> bool {
+        self.code.is_empty()
     }
     pub fn patch_jump(&mut self, offset: usize) {
         let jump = self.code.len().saturating_sub(offset).saturating_sub(2);

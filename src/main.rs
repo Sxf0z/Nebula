@@ -5,7 +5,7 @@ use std::process;
 use std::time::Instant;
 
 use colored::Colorize;
-use nebula::{Lexer, Parser, Interpreter, NebulaError, VM, Compiler, Value};
+use nebula::{Compiler, Interpreter, Lexer, NebulaError, Parser, Value, VM};
 
 const BANNER: &str = r#"
 ▀█▄    ▀█▀         ▀██                ▀██          
@@ -52,9 +52,22 @@ fn print_usage() {
     println!("{}", "  Logic is Electric.".purple().italic());
     println!();
     println!("{}", "USAGE:".bold().white());
-    println!("  {} {}              {}", "nebula".cyan(), "".dimmed(), "Start REPL");
-    println!("  {} {}  {}", "nebula".cyan(), "<script.na>".green(), "Run script (interpreter)");
-    println!("  {} {} {} {}", "nebula".cyan(), "--vm".yellow(), "<script>".green(), "Run script (fast VM)");
+    println!(
+        "  {} {}              Start REPL",
+        "nebula".cyan(),
+        "".dimmed()
+    );
+    println!(
+        "  {} {}  Run script (interpreter)",
+        "nebula".cyan(),
+        "<script.na>".green()
+    );
+    println!(
+        "  {} {} {} Run script (fast VM)",
+        "nebula".cyan(),
+        "--vm".yellow(),
+        "<script>".green()
+    );
     println!();
     println!("{}", "OPTIONS:".bold().white());
     println!("  {}    Use bytecode VM (35x faster)", "--vm".yellow());
@@ -63,8 +76,17 @@ fn print_usage() {
 
 fn run_repl(use_vm: bool) {
     println!("{}", BANNER.cyan());
-    let mode = if use_vm { "VM".green() } else { "Interpreter".blue() };
-    println!("  {} {} {}", "Nebula".purple().bold(), "v1.0".dimmed(), mode);
+    let mode = if use_vm {
+        "VM".green()
+    } else {
+        "Interpreter".blue()
+    };
+    println!(
+        "  {} {} {}",
+        "Nebula".purple().bold(),
+        "v1.0".dimmed(),
+        mode
+    );
     println!("  Type {} to quit\n", "'exit'".dimmed());
 
     let mut interpreter = Interpreter::new();
@@ -118,7 +140,12 @@ fn run_file(path: &str, use_vm: bool) {
     let source = match fs::read_to_string(path) {
         Ok(s) => s,
         Err(e) => {
-            eprintln!("{} Cannot read '{}': {}", "[FILE ERROR]".bold().red(), path.yellow(), e);
+            eprintln!(
+                "{} Cannot read '{}': {}",
+                "[FILE ERROR]".bold().red(),
+                path.yellow(),
+                e
+            );
             process::exit(66);
         }
     };
@@ -136,7 +163,10 @@ fn run_file(path: &str, use_vm: bool) {
 
     match result {
         Ok(_) => {
-            println!("{}", format!("✨ Executed in {:.3}s", elapsed.as_secs_f64()).cyan());
+            println!(
+                "{}",
+                format!("✨ Executed in {:.3}s", elapsed.as_secs_f64()).cyan()
+            );
         }
         Err(e) => {
             report_error(&source, &e);
@@ -206,12 +236,12 @@ fn nanbox_to_value(nb: nebula::vm::NanBoxed) -> Value {
             nebula::vm::HeapData::List(items) => {
                 Value::List(items.iter().map(|v| nanbox_to_value(*v)).collect())
             }
-            nebula::vm::HeapData::Map(map) => {
-                Value::Map(map.iter().map(|(k, v)| (k.to_string(), nanbox_to_value(*v))).collect())
-            }
-            nebula::vm::HeapData::Function(f) => {
-                Value::String(format!("<fn {}>", f.name))
-            }
+            nebula::vm::HeapData::Map(map) => Value::Map(
+                map.iter()
+                    .map(|(k, v)| (k.to_string(), nanbox_to_value(*v)))
+                    .collect(),
+            ),
+            nebula::vm::HeapData::Function(f) => Value::String(format!("<fn {}>", f.name)),
         }
     } else {
         Value::Nil
@@ -229,7 +259,11 @@ fn report_error(source: &str, error: &NebulaError) {
             eprintln!("  {} line {}", "-->".cyan(), span.line);
             eprintln!("   {}", "|".cyan());
             eprintln!("{:3} {} {}", span.line, "|".cyan(), line_content);
-            eprintln!("   {} {}^", "|".cyan(), " ".repeat(span.column.saturating_sub(1)));
+            eprintln!(
+                "   {} {}^",
+                "|".cyan(),
+                " ".repeat(span.column.saturating_sub(1))
+            );
         }
     }
 }

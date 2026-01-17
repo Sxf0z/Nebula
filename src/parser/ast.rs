@@ -24,15 +24,15 @@ pub struct Function {
 }
 #[derive(Debug, Clone)]
 pub enum FunctionBody {
-    Expression(Expr),      
-    Block(Vec<Stmt>),      
+    Expression(Expr),
+    Block(Vec<Stmt>),
 }
 #[derive(Debug, Clone)]
 pub struct Param {
     pub name: String,
     pub ty: Option<Type>,
     pub default: Option<Expr>,
-    pub variadic: bool,  
+    pub variadic: bool,
 }
 #[derive(Debug, Clone)]
 pub struct Struct {
@@ -128,10 +128,10 @@ pub enum Stmt {
 }
 #[derive(Debug, Clone, Copy)]
 pub enum CompoundOp {
-    Add,  
-    Sub,  
-    Mul,  
-    Div,  
+    Add,
+    Sub,
+    Mul,
+    Div,
 }
 #[derive(Debug, Clone)]
 pub struct MatchArm {
@@ -140,9 +140,9 @@ pub struct MatchArm {
 }
 #[derive(Debug, Clone)]
 pub enum Pattern {
-    Wildcard,           
-    Binding(String),    
-    Literal(Literal),   
+    Wildcard,
+    Binding(String),
+    Literal(Literal),
 }
 #[derive(Debug, Clone)]
 pub enum Expr {
@@ -235,10 +235,25 @@ pub enum Literal {
 }
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BinaryOp {
-    Add, Sub, Mul, Div, Mod, Pow,
-    Eq, Ne, Lt, Gt, Le, Ge,
-    And, Or,
-    BitAnd, BitOr, BitXor, Shl, Shr,
+    Add,
+    Sub,
+    Mul,
+    Div,
+    Mod,
+    Pow,
+    Eq,
+    Ne,
+    Lt,
+    Gt,
+    Le,
+    Ge,
+    And,
+    Or,
+    BitAnd,
+    BitOr,
+    BitXor,
+    Shl,
+    Shr,
 }
 impl BinaryOp {
     pub fn as_str(&self) -> &'static str {
@@ -267,27 +282,27 @@ impl BinaryOp {
 }
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum UnaryOp {
-    Neg,    
-    Not,    
-    BitNot, 
+    Neg,
+    Not,
+    BitNot,
 }
 #[derive(Debug, Clone, PartialEq)]
 pub enum Type {
-    Nb,         
-    Int,        
-    Fl,         
-    Wrd,        
-    Bool,       
-    By,         
-    Chr,        
-    Any,        
-    Void,       
-    Nil,        
-    Lst(Option<Box<Type>>),     
-    Map(Option<Box<Type>>, Option<Box<Type>>),  
-    Tup(Vec<Type>),             
-    Set(Option<Box<Type>>),     
-    Optional(Box<Type>),        
+    Nb,
+    Int,
+    Fl,
+    Wrd,
+    Bool,
+    By,
+    Chr,
+    Any,
+    Void,
+    Nil,
+    Lst(Option<Box<Type>>),
+    Map(Option<Box<Type>>, Option<Box<Type>>),
+    Tup(Vec<Type>),
+    Set(Option<Box<Type>>),
+    Optional(Box<Type>),
     Named(String),
 }
 impl Type {

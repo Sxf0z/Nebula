@@ -1,4 +1,4 @@
-use crate::error::{SpectreError, SpectreResult, ErrorCode};
+use crate::error::{NebulaError, NebulaResult, ErrorCode};
 use super::{Chunk, OpCode, NanBoxed, HeapObject, CompiledFunction};
 const STACK_SIZE: usize = 256;
 const MAX_GLOBALS: usize = 256;
@@ -43,7 +43,7 @@ impl VMNanBox {
             iteration_count: 0,
         }
     }
-    pub fn run(&mut self, chunk: &Chunk, global_names: &[String]) -> SpectreResult<NanBoxed> {
+    pub fn run(&mut self, chunk: &Chunk, global_names: &[String]) -> NebulaResult<NanBoxed> {
         self.run_with_functions(chunk, global_names, &[])
     }
     pub fn run_with_functions(
@@ -51,7 +51,7 @@ impl VMNanBox {
         chunk: &Chunk, 
         global_names: &[String],
         functions: &[CompiledFunction]
-    ) -> SpectreResult<NanBoxed> {
+    ) -> NebulaResult<NanBoxed> {
         self.ip = 0;
         self.frame_base = 0;
         self.iteration_count = 0;
@@ -65,7 +65,7 @@ impl VMNanBox {
         });
         self.run_main_loop(chunk, functions)
     }
-    fn run_main_loop(&mut self, chunk: &Chunk, functions: &[CompiledFunction]) -> SpectreResult<NanBoxed> {
+    fn run_main_loop(&mut self, chunk: &Chunk, functions: &[CompiledFunction]) -> NebulaResult<NanBoxed> {
         loop {
             if self.ip >= chunk.code().len() {
                 break;
@@ -73,7 +73,7 @@ impl VMNanBox {
             let byte = chunk.read_byte(self.ip);
             let op = match OpCode::from_byte(byte) {
                 Some(op) => op,
-                None => return Err(SpectreError::coded(ErrorCode::E004, format!("invalid opcode {}", byte))),
+                None => return Err(NebulaError::coded(ErrorCode::E004, format!("invalid opcode {}", byte))),
             };
             self.ip += 1;
             match op {
@@ -108,7 +108,7 @@ impl VMNanBox {
                     let idx = chunk.read_byte(self.ip) as usize;
                     self.ip += 1;
                     if idx >= self.globals.len() {
-                        return Err(SpectreError::coded(ErrorCode::E013, format!("global index {} out of bounds", idx)));
+                        return Err(NebulaError::coded(ErrorCode::E013, format!("global index {} out of bounds", idx)));
                     }
                     let value = self.globals[idx];
                     self.push(value)?;
@@ -117,7 +117,7 @@ impl VMNanBox {
                     let idx = chunk.read_byte(self.ip) as usize;
                     self.ip += 1;
                     if idx >= self.globals.len() {
-                        return Err(SpectreError::coded(ErrorCode::E013, format!("global index {} out of bounds", idx)));
+                        return Err(NebulaError::coded(ErrorCode::E013, format!("global index {} out of bounds", idx)));
                     }
                     let value = self.peek(0)?;
                     self.globals[idx] = value;
@@ -126,7 +126,7 @@ impl VMNanBox {
                     let idx = chunk.read_byte(self.ip) as usize;
                     self.ip += 1;
                     if idx >= self.globals.len() {
-                        return Err(SpectreError::coded(ErrorCode::E013, format!("global index {} out of bounds", idx)));
+                        return Err(NebulaError::coded(ErrorCode::E013, format!("global index {} out of bounds", idx)));
                     }
                     let value = self.pop()?;
                     self.globals[idx] = value;
@@ -221,7 +221,7 @@ impl VMNanBox {
                     } else if v.is_number() {
                         self.push(NanBoxed::number(v.as_number() + 1.0))?;
                     } else {
-                        return Err(SpectreError::coded(ErrorCode::E031, "inc"));
+                        return Err(NebulaError::coded(ErrorCode::E031, "inc"));
                     }
                 }
                 OpCode::Dec => {
@@ -231,7 +231,7 @@ impl VMNanBox {
                     } else if v.is_number() {
                         self.push(NanBoxed::number(v.as_number() - 1.0))?;
                     } else {
-                        return Err(SpectreError::coded(ErrorCode::E031, "dec"));
+                        return Err(NebulaError::coded(ErrorCode::E031, "dec"));
                     }
                 }
                 OpCode::Add => {
@@ -247,7 +247,7 @@ impl VMNanBox {
                         self.push(NanBoxed::number(na + nb))?;
                     }
                     else {
-                        return Err(SpectreError::coded(ErrorCode::E031, "add"));
+                        return Err(NebulaError::coded(ErrorCode::E031, "add"));
                     }
                 }
                 OpCode::Sub => {
@@ -260,7 +260,7 @@ impl VMNanBox {
                     } else if let (Some(na), Some(nb)) = (a.as_numeric(), b.as_numeric()) {
                         self.push(NanBoxed::number(na - nb))?;
                     } else {
-                        return Err(SpectreError::coded(ErrorCode::E031, "sub"));
+                        return Err(NebulaError::coded(ErrorCode::E031, "sub"));
                     }
                 }
                 OpCode::Mul => {
@@ -273,16 +273,16 @@ impl VMNanBox {
                     } else if let (Some(na), Some(nb)) = (a.as_numeric(), b.as_numeric()) {
                         self.push(NanBoxed::number(na * nb))?;
                     } else {
-                        return Err(SpectreError::coded(ErrorCode::E031, "mul"));
+                        return Err(NebulaError::coded(ErrorCode::E031, "mul"));
                     }
                 }
                 OpCode::Div => {
                     let b = self.pop()?;
                     let a = self.pop()?;
-                    let nb = b.as_numeric().ok_or_else(|| SpectreError::coded(ErrorCode::E031, "div"))?;
-                    let na = a.as_numeric().ok_or_else(|| SpectreError::coded(ErrorCode::E031, "div"))?;
+                    let nb = b.as_numeric().ok_or_else(|| NebulaError::coded(ErrorCode::E031, "div"))?;
+                    let na = a.as_numeric().ok_or_else(|| NebulaError::coded(ErrorCode::E031, "div"))?;
                     if nb == 0.0 {
-                        return Err(SpectreError::coded(ErrorCode::E040, ""));
+                        return Err(NebulaError::coded(ErrorCode::E040, ""));
                     }
                     self.push(NanBoxed::number(na / nb))?;
                 }
@@ -292,7 +292,7 @@ impl VMNanBox {
                     if let (Some(na), Some(nb)) = (a.as_numeric(), b.as_numeric()) {
                         self.push(NanBoxed::number(na % nb))?;
                     } else {
-                        return Err(SpectreError::coded(ErrorCode::E031, "mod"));
+                        return Err(NebulaError::coded(ErrorCode::E031, "mod"));
                     }
                 }
                 OpCode::Pow => {
@@ -301,7 +301,7 @@ impl VMNanBox {
                     if let (Some(na), Some(nb)) = (a.as_numeric(), b.as_numeric()) {
                         self.push(NanBoxed::number(na.powf(nb)))?;
                     } else {
-                        return Err(SpectreError::coded(ErrorCode::E031, "pow"));
+                        return Err(NebulaError::coded(ErrorCode::E031, "pow"));
                     }
                 }
                 OpCode::Neg => {
@@ -311,7 +311,7 @@ impl VMNanBox {
                     } else if v.is_integer() {
                         self.push(NanBoxed::integer(-v.as_integer()))?;
                     } else {
-                        return Err(SpectreError::coded(ErrorCode::E031, "neg"));
+                        return Err(NebulaError::coded(ErrorCode::E031, "neg"));
                     }
                 }
                 OpCode::Eq => {
@@ -330,7 +330,7 @@ impl VMNanBox {
                     if let (Some(na), Some(nb)) = (a.as_numeric(), b.as_numeric()) {
                         self.push(NanBoxed::boolean(na < nb))?;
                     } else {
-                        return Err(SpectreError::coded(ErrorCode::E031, "lt"));
+                        return Err(NebulaError::coded(ErrorCode::E031, "lt"));
                     }
                 }
                 OpCode::Gt => {
@@ -339,7 +339,7 @@ impl VMNanBox {
                     if let (Some(na), Some(nb)) = (a.as_numeric(), b.as_numeric()) {
                         self.push(NanBoxed::boolean(na > nb))?;
                     } else {
-                        return Err(SpectreError::coded(ErrorCode::E031, "gt"));
+                        return Err(NebulaError::coded(ErrorCode::E031, "gt"));
                     }
                 }
                 OpCode::Le => {
@@ -348,7 +348,7 @@ impl VMNanBox {
                     if let (Some(na), Some(nb)) = (a.as_numeric(), b.as_numeric()) {
                         self.push(NanBoxed::boolean(na <= nb))?;
                     } else {
-                        return Err(SpectreError::coded(ErrorCode::E031, "le"));
+                        return Err(NebulaError::coded(ErrorCode::E031, "le"));
                     }
                 }
                 OpCode::Ge => {
@@ -357,7 +357,7 @@ impl VMNanBox {
                     if let (Some(na), Some(nb)) = (a.as_numeric(), b.as_numeric()) {
                         self.push(NanBoxed::boolean(na >= nb))?;
                     } else {
-                        return Err(SpectreError::coded(ErrorCode::E031, "ge"));
+                        return Err(NebulaError::coded(ErrorCode::E031, "ge"));
                     }
                 }
                 OpCode::Not => {
@@ -417,7 +417,7 @@ impl VMNanBox {
                 OpCode::CheckIterLimit => {
                     self.iteration_count += 1;
                     if self.iteration_count > MAX_ITERATIONS {
-                        return Err(SpectreError::coded(ErrorCode::E071, "vm loop"));
+                        return Err(NebulaError::coded(ErrorCode::E071, "vm loop"));
                     }
                 }
                 OpCode::Call => {
@@ -437,13 +437,13 @@ impl VMNanBox {
                             }
                             super::HeapData::Function(func) => {
                                 if argc != func.arity as usize {
-                                    return Err(SpectreError::coded(
+                                    return Err(NebulaError::coded(
                                         ErrorCode::E012, 
                                         format!("{}: expected {} args, got {}", func.name, func.arity, argc)
                                     ));
                                 }
                                 if self.frames.len() >= MAX_FRAMES {
-                                    return Err(SpectreError::coded(
+                                    return Err(NebulaError::coded(
                                         ErrorCode::E071, 
                                         format!("stack overflow: max {} frames", MAX_FRAMES)
                                     ));
@@ -463,11 +463,11 @@ impl VMNanBox {
                                 self.push(result)?;
                             }
                             _ => {
-                                return Err(SpectreError::coded(ErrorCode::E011, "not callable"));
+                                return Err(NebulaError::coded(ErrorCode::E011, "not callable"));
                             }
                         }
                     } else {
-                        return Err(SpectreError::coded(ErrorCode::E011, "not callable"));
+                        return Err(NebulaError::coded(ErrorCode::E011, "not callable"));
                     }
                 }
                 OpCode::List => {
@@ -489,11 +489,11 @@ impl VMNanBox {
                         let ptr = HeapObject::new_function(func);
                         self.push(NanBoxed::ptr(ptr))?;
                     } else {
-                        return Err(SpectreError::coded(ErrorCode::E004, format!("invalid function index {}", func_idx)));
+                        return Err(NebulaError::coded(ErrorCode::E004, format!("invalid function index {}", func_idx)));
                     }
                 }
                 _ => {
-                    return Err(SpectreError::coded(ErrorCode::E004, format!("unhandled opcode {:?}", op)));
+                    return Err(NebulaError::coded(ErrorCode::E004, format!("unhandled opcode {:?}", op)));
                 }
             }
         }
@@ -503,7 +503,7 @@ impl VMNanBox {
             self.pop()?
         })
     }
-    fn execute_function_body(&mut self, chunk: &Chunk) -> SpectreResult<NanBoxed> {
+    fn execute_function_body(&mut self, chunk: &Chunk) -> NebulaResult<NanBoxed> {
         loop {
             if self.ip >= chunk.code().len() {
                 break;
@@ -511,7 +511,7 @@ impl VMNanBox {
             let byte = chunk.read_byte(self.ip);
             let op = match OpCode::from_byte(byte) {
                 Some(op) => op,
-                None => return Err(SpectreError::coded(ErrorCode::E004, format!("invalid opcode {}", byte))),
+                None => return Err(NebulaError::coded(ErrorCode::E004, format!("invalid opcode {}", byte))),
             };
             self.ip += 1;
             match op {
@@ -569,7 +569,7 @@ impl VMNanBox {
                     if let (Some(av), Some(bv)) = (a.as_numeric(), b.as_numeric()) {
                         self.push(NanBoxed::number(av + bv))?;
                     } else {
-                        return Err(SpectreError::coded(ErrorCode::E031, "add"));
+                        return Err(NebulaError::coded(ErrorCode::E031, "add"));
                     }
                 }
                 OpCode::Sub => {
@@ -578,7 +578,7 @@ impl VMNanBox {
                     if let (Some(av), Some(bv)) = (a.as_numeric(), b.as_numeric()) {
                         self.push(NanBoxed::number(av - bv))?;
                     } else {
-                        return Err(SpectreError::coded(ErrorCode::E031, "sub"));
+                        return Err(NebulaError::coded(ErrorCode::E031, "sub"));
                     }
                 }
                 OpCode::Mul => {
@@ -587,7 +587,7 @@ impl VMNanBox {
                     if let (Some(av), Some(bv)) = (a.as_numeric(), b.as_numeric()) {
                         self.push(NanBoxed::number(av * bv))?;
                     } else {
-                        return Err(SpectreError::coded(ErrorCode::E031, "mul"));
+                        return Err(NebulaError::coded(ErrorCode::E031, "mul"));
                     }
                 }
                 OpCode::Div => {
@@ -595,11 +595,11 @@ impl VMNanBox {
                     let a = self.pop()?;
                     if let (Some(av), Some(bv)) = (a.as_numeric(), b.as_numeric()) {
                         if bv == 0.0 {
-                            return Err(SpectreError::coded(ErrorCode::E040, ""));
+                            return Err(NebulaError::coded(ErrorCode::E040, ""));
                         }
                         self.push(NanBoxed::number(av / bv))?;
                     } else {
-                        return Err(SpectreError::coded(ErrorCode::E031, "div"));
+                        return Err(NebulaError::coded(ErrorCode::E031, "div"));
                     }
                 }
                 OpCode::Neg => {
@@ -607,7 +607,7 @@ impl VMNanBox {
                     if let Some(n) = v.as_numeric() {
                         self.push(NanBoxed::number(-n))?;
                     } else {
-                        return Err(SpectreError::coded(ErrorCode::E031, "neg"));
+                        return Err(NebulaError::coded(ErrorCode::E031, "neg"));
                     }
                 }
                 OpCode::Eq => {
@@ -626,7 +626,7 @@ impl VMNanBox {
                     if let (Some(av), Some(bv)) = (a.as_numeric(), b.as_numeric()) {
                         self.push(NanBoxed::boolean(av < bv))?;
                     } else {
-                        return Err(SpectreError::coded(ErrorCode::E031, "lt"));
+                        return Err(NebulaError::coded(ErrorCode::E031, "lt"));
                     }
                 }
                 OpCode::Gt => {
@@ -635,14 +635,14 @@ impl VMNanBox {
                     if let (Some(av), Some(bv)) = (a.as_numeric(), b.as_numeric()) {
                         self.push(NanBoxed::boolean(av > bv))?;
                     } else {
-                        return Err(SpectreError::coded(ErrorCode::E031, "gt"));
+                        return Err(NebulaError::coded(ErrorCode::E031, "gt"));
                     }
                 }
                 OpCode::LoadGlobal => {
                     let idx = chunk.read_byte(self.ip) as usize;
                     self.ip += 1;
                     if idx >= self.globals.len() {
-                        return Err(SpectreError::coded(ErrorCode::E013, format!("global index {} out of bounds", idx)));
+                        return Err(NebulaError::coded(ErrorCode::E013, format!("global index {} out of bounds", idx)));
                     }
                     let value = self.globals[idx];
                     self.push(value)?;
@@ -685,7 +685,7 @@ impl VMNanBox {
                             self.push(result)?;
                         } else if let super::HeapData::Function(func) = &obj.data {
                              if argc != func.arity as usize {
-                                return Err(SpectreError::coded(ErrorCode::E012, "arity mismatch"));
+                                return Err(NebulaError::coded(ErrorCode::E012, "arity mismatch"));
                              }
                              let saved_ip = self.ip;
                              let saved_base = self.frame_base;
@@ -698,10 +698,10 @@ impl VMNanBox {
                              for _ in 0..=argc { self.pop()?; }
                              self.push(result)?;
                         } else {
-                            return Err(SpectreError::coded(ErrorCode::E011, "not callable in fn"));
+                            return Err(NebulaError::coded(ErrorCode::E011, "not callable in fn"));
                         }
                     } else {
-                        return Err(SpectreError::coded(ErrorCode::E011, "not callable in fn"));
+                        return Err(NebulaError::coded(ErrorCode::E011, "not callable in fn"));
                     }
                 }
                 OpCode::Jump => {
@@ -724,28 +724,28 @@ impl VMNanBox {
                 OpCode::CheckIterLimit => {
                 }
                 _ => {
-                    return Err(SpectreError::coded(ErrorCode::E004, format!("unsupported opcode in function: {:?}", op)));
+                    return Err(NebulaError::coded(ErrorCode::E004, format!("unsupported opcode in function: {:?}", op)));
                 }
             }
         }
         Ok(NanBoxed::nil())
     }
     #[inline(always)]
-    fn push(&mut self, value: NanBoxed) -> SpectreResult<()> {
+    fn push(&mut self, value: NanBoxed) -> NebulaResult<()> {
         if self.stack.len() >= STACK_SIZE {
-            return Err(SpectreError::coded(ErrorCode::E050, "stack"));
+            return Err(NebulaError::coded(ErrorCode::E050, "stack"));
         }
         self.stack.push(value);
         Ok(())
     }
     #[inline(always)]
-    fn pop(&mut self) -> SpectreResult<NanBoxed> {
-        self.stack.pop().ok_or_else(|| SpectreError::coded(ErrorCode::E013, "empty stack"))
+    fn pop(&mut self) -> NebulaResult<NanBoxed> {
+        self.stack.pop().ok_or_else(|| NebulaError::coded(ErrorCode::E013, "empty stack"))
     }
     #[inline(always)]
-    fn peek(&self, distance: usize) -> SpectreResult<NanBoxed> {
+    fn peek(&self, distance: usize) -> NebulaResult<NanBoxed> {
         if self.stack.len() <= distance {
-            return Err(SpectreError::coded(ErrorCode::E013, "stack underflow"));
+            return Err(NebulaError::coded(ErrorCode::E013, "stack underflow"));
         }
         Ok(self.stack[self.stack.len() - 1 - distance])
     }
@@ -781,7 +781,7 @@ impl VMNanBox {
         }
         false
     }
-    fn call_builtin(&self, name: &str, argc: usize) -> SpectreResult<NanBoxed> {
+    fn call_builtin(&self, name: &str, argc: usize) -> NebulaResult<NanBoxed> {
         let mut args = Vec::with_capacity(argc);
         for i in 0..argc {
             args.push(self.peek(argc - 1 - i)?);
@@ -794,7 +794,7 @@ impl VMNanBox {
             }
             "typeof" => {
                 if args.is_empty() {
-                    return Err(SpectreError::coded(ErrorCode::E012, "typeof"));
+                    return Err(NebulaError::coded(ErrorCode::E012, "typeof"));
                 }
                 let type_name = if args[0].is_nil() {
                     "nil"
@@ -820,26 +820,26 @@ impl VMNanBox {
             }
             "sqrt" => {
                 if args.is_empty() {
-                    return Err(SpectreError::coded(ErrorCode::E012, "sqrt"));
+                    return Err(NebulaError::coded(ErrorCode::E012, "sqrt"));
                 }
-                let n = args[0].as_numeric().ok_or_else(|| SpectreError::coded(ErrorCode::E031, "sqrt"))?;
+                let n = args[0].as_numeric().ok_or_else(|| NebulaError::coded(ErrorCode::E031, "sqrt"))?;
                 Ok(NanBoxed::number(n.sqrt()))
             }
             "abs" => {
                 if args.is_empty() {
-                    return Err(SpectreError::coded(ErrorCode::E012, "abs"));
+                    return Err(NebulaError::coded(ErrorCode::E012, "abs"));
                 }
                 if args[0].is_integer() {
                     Ok(NanBoxed::integer(args[0].as_integer().abs()))
                 } else if args[0].is_number() {
                     Ok(NanBoxed::number(args[0].as_number().abs()))
                 } else {
-                    Err(SpectreError::coded(ErrorCode::E031, "abs"))
+                    Err(NebulaError::coded(ErrorCode::E031, "abs"))
                 }
             }
             "len" => {
                 if args.is_empty() {
-                    return Err(SpectreError::coded(ErrorCode::E012, "len"));
+                    return Err(NebulaError::coded(ErrorCode::E012, "len"));
                 }
                 if args[0].is_ptr() {
                     let obj = unsafe { &*args[0].as_ptr() };
@@ -851,41 +851,41 @@ impl VMNanBox {
                     };
                     Ok(NanBoxed::integer(len as i64))
                 } else {
-                    Err(SpectreError::coded(ErrorCode::E031, "len"))
+                    Err(NebulaError::coded(ErrorCode::E031, "len"))
                 }
             }
             "floor" => {
-                if args.is_empty() { return Err(SpectreError::coded(ErrorCode::E012, "floor")); }
-                let n = args[0].as_numeric().ok_or_else(|| SpectreError::coded(ErrorCode::E031, "floor"))?;
+                if args.is_empty() { return Err(NebulaError::coded(ErrorCode::E012, "floor")); }
+                let n = args[0].as_numeric().ok_or_else(|| NebulaError::coded(ErrorCode::E031, "floor"))?;
                 Ok(NanBoxed::number(n.floor()))
             }
             "ceil" => {
-                if args.is_empty() { return Err(SpectreError::coded(ErrorCode::E012, "ceil")); }
-                let n = args[0].as_numeric().ok_or_else(|| SpectreError::coded(ErrorCode::E031, "ceil"))?;
+                if args.is_empty() { return Err(NebulaError::coded(ErrorCode::E012, "ceil")); }
+                let n = args[0].as_numeric().ok_or_else(|| NebulaError::coded(ErrorCode::E031, "ceil"))?;
                 Ok(NanBoxed::number(n.ceil()))
             }
             "round" => {
-                if args.is_empty() { return Err(SpectreError::coded(ErrorCode::E012, "round")); }
-                let n = args[0].as_numeric().ok_or_else(|| SpectreError::coded(ErrorCode::E031, "round"))?;
+                if args.is_empty() { return Err(NebulaError::coded(ErrorCode::E012, "round")); }
+                let n = args[0].as_numeric().ok_or_else(|| NebulaError::coded(ErrorCode::E031, "round"))?;
                 Ok(NanBoxed::number(n.round()))
             }
             "pow" => {
-                if args.len() < 2 { return Err(SpectreError::coded(ErrorCode::E012, "pow")); }
-                let base = args[0].as_numeric().ok_or_else(|| SpectreError::coded(ErrorCode::E031, "pow"))?;
-                let exp = args[1].as_numeric().ok_or_else(|| SpectreError::coded(ErrorCode::E031, "pow"))?;
+                if args.len() < 2 { return Err(NebulaError::coded(ErrorCode::E012, "pow")); }
+                let base = args[0].as_numeric().ok_or_else(|| NebulaError::coded(ErrorCode::E031, "pow"))?;
+                let exp = args[1].as_numeric().ok_or_else(|| NebulaError::coded(ErrorCode::E031, "pow"))?;
                 Ok(NanBoxed::number(base.powf(exp)))
             }
             "sin" => {
-                if args.is_empty() { return Err(SpectreError::coded(ErrorCode::E012, "sin")); }
-                let n = args[0].as_numeric().ok_or_else(|| SpectreError::coded(ErrorCode::E031, "sin"))?;
+                if args.is_empty() { return Err(NebulaError::coded(ErrorCode::E012, "sin")); }
+                let n = args[0].as_numeric().ok_or_else(|| NebulaError::coded(ErrorCode::E031, "sin"))?;
                 Ok(NanBoxed::number(n.sin()))
             }
             "cos" => {
-                if args.is_empty() { return Err(SpectreError::coded(ErrorCode::E012, "cos")); }
-                let n = args[0].as_numeric().ok_or_else(|| SpectreError::coded(ErrorCode::E031, "cos"))?;
+                if args.is_empty() { return Err(NebulaError::coded(ErrorCode::E012, "cos")); }
+                let n = args[0].as_numeric().ok_or_else(|| NebulaError::coded(ErrorCode::E031, "cos"))?;
                 Ok(NanBoxed::number(n.cos()))
             }
-            _ => Err(SpectreError::coded(ErrorCode::E010, name)),
+            _ => Err(NebulaError::coded(ErrorCode::E010, name)),
         }
     }
 }

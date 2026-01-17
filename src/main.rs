@@ -5,7 +5,7 @@ use std::process;
 use std::time::Instant;
 
 use colored::Colorize;
-use nebula::{Lexer, Parser, Interpreter, SpectreError, VM, Compiler, Value};
+use nebula::{Lexer, Parser, Interpreter, NebulaError, VM, Compiler, Value};
 
 const BANNER: &str = r#"
 ▀█▄    ▀█▀         ▀██                ▀██          
@@ -145,13 +145,13 @@ fn run_file(path: &str, use_vm: bool) {
     }
 }
 
-fn run_interpreter(source: &str, interpreter: &mut Interpreter) -> Result<Value, SpectreError> {
+fn run_interpreter(source: &str, interpreter: &mut Interpreter) -> Result<Value, NebulaError> {
     let lexer = Lexer::new(source);
     let tokens: Vec<_> = lexer.collect();
 
     for token in &tokens {
         if let nebula::TokenKind::Error(msg) = &token.kind {
-            return Err(SpectreError::Lexer {
+            return Err(NebulaError::Lexer {
                 message: msg.clone(),
                 span: token.span,
             });
@@ -163,13 +163,13 @@ fn run_interpreter(source: &str, interpreter: &mut Interpreter) -> Result<Value,
     interpreter.interpret(&program)
 }
 
-fn run_vm(source: &str) -> Result<Value, SpectreError> {
+fn run_vm(source: &str) -> Result<Value, NebulaError> {
     let lexer = Lexer::new(source);
     let tokens: Vec<_> = lexer.collect();
 
     for token in &tokens {
         if let nebula::TokenKind::Error(msg) = &token.kind {
-            return Err(SpectreError::Lexer {
+            return Err(NebulaError::Lexer {
                 message: msg.clone(),
                 span: token.span,
             });
@@ -218,7 +218,7 @@ fn nanbox_to_value(nb: nebula::vm::NanBoxed) -> Value {
     }
 }
 
-fn report_error(source: &str, error: &SpectreError) {
+fn report_error(source: &str, error: &NebulaError) {
     eprintln!("{}", "[COSMIC FRACTURE]".bold().red());
     eprintln!("{}", error.message().red());
 

@@ -3,7 +3,7 @@ mod expr;
 mod stmt;
 mod types;
 use crate::lexer::{Token, TokenKind};
-use crate::error::{SpectreError, SpectreResult};
+use crate::error::{NebulaError, NebulaResult};
 pub use ast::*;
 pub struct Parser {
     tokens: Vec<Token>,
@@ -13,7 +13,7 @@ impl Parser {
     pub fn new(tokens: Vec<Token>) -> Self {
         Self { tokens, current: 0 }
     }
-    pub fn parse_program(&mut self) -> SpectreResult<Program> {
+    pub fn parse_program(&mut self) -> NebulaResult<Program> {
         let mut items = Vec::new();
         self.skip_newlines();
         while !self.is_at_end() {
@@ -22,7 +22,7 @@ impl Parser {
         }
         Ok(Program { items })
     }
-    fn parse_item(&mut self) -> SpectreResult<Item> {
+    fn parse_item(&mut self) -> NebulaResult<Item> {
         self.skip_newlines();
         match &self.peek().kind {
             TokenKind::Function | TokenKind::Async => self.parse_function().map(Item::Function),
@@ -37,7 +37,7 @@ impl Parser {
             }
         }
     }
-    fn parse_function(&mut self) -> SpectreResult<Function> {
+    fn parse_function(&mut self) -> NebulaResult<Function> {
         let is_async = self.match_token(&TokenKind::Async);
         let start_span = self.expect(TokenKind::Function)?.span;
         let name = self.expect_identifier()?;
@@ -62,7 +62,7 @@ impl Parser {
             span: start_span,
         })
     }
-    fn parse_params(&mut self) -> SpectreResult<Vec<Param>> {
+    fn parse_params(&mut self) -> NebulaResult<Vec<Param>> {
         let mut params = Vec::new();
         if !self.check(&TokenKind::RightParen) {
             loop {
@@ -86,7 +86,7 @@ impl Parser {
         }
         Ok(params)
     }
-    fn parse_struct(&mut self) -> SpectreResult<Struct> {
+    fn parse_struct(&mut self) -> NebulaResult<Struct> {
         let start_span = self.expect(TokenKind::Struct)?.span;
         let name = self.expect_identifier()?;
         self.expect(TokenKind::LeftBrace)?;
@@ -106,7 +106,7 @@ impl Parser {
         self.expect(TokenKind::RightBrace)?;
         Ok(Struct { name, fields, span: start_span })
     }
-    fn parse_enum(&mut self) -> SpectreResult<Enum> {
+    fn parse_enum(&mut self) -> NebulaResult<Enum> {
         let start_span = self.expect(TokenKind::Enum)?.span;
         let name = self.expect_identifier()?;
         self.expect(TokenKind::LeftBrace)?;
@@ -123,19 +123,19 @@ impl Parser {
         self.expect(TokenKind::RightBrace)?;
         Ok(Enum { name, variants, span: start_span })
     }
-    fn parse_type_alias(&mut self) -> SpectreResult<TypeAlias> {
+    fn parse_type_alias(&mut self) -> NebulaResult<TypeAlias> {
         let start_span = self.expect(TokenKind::Type)?.span;
         let name = self.expect_identifier()?;
         self.expect(TokenKind::Assign)?;
         let ty = self.parse_type()?;
         Ok(TypeAlias { name, ty, span: start_span })
     }
-    fn parse_module(&mut self) -> SpectreResult<Module> {
+    fn parse_module(&mut self) -> NebulaResult<Module> {
         let start_span = self.expect(TokenKind::Mod)?.span;
         let name = self.expect_identifier()?;
         Ok(Module { name, span: start_span })
     }
-    fn parse_use(&mut self) -> SpectreResult<Use> {
+    fn parse_use(&mut self) -> NebulaResult<Use> {
         let start_span = self.expect(TokenKind::Use)?.span;
         let path = self.expect_identifier()?;
         let alias = if self.match_token(&TokenKind::As) {
@@ -145,7 +145,7 @@ impl Parser {
         };
         Ok(Use { path, alias, span: start_span })
     }
-    fn parse_block_until_end(&mut self) -> SpectreResult<Vec<Stmt>> {
+    fn parse_block_until_end(&mut self) -> NebulaResult<Vec<Stmt>> {
         let mut statements = Vec::new();
         self.skip_newlines();
         while !self.check(&TokenKind::End) && 
@@ -160,7 +160,7 @@ impl Parser {
         }
         Ok(statements)
     }
-    pub fn parse_statement(&mut self) -> SpectreResult<Stmt> {
+    pub fn parse_statement(&mut self) -> NebulaResult<Stmt> {
         self.skip_newlines();
         match &self.peek().kind {
             TokenKind::Perm => self.parse_const(),
@@ -203,7 +203,7 @@ impl Parser {
             _ => None
         }
     }
-    fn parse_const(&mut self) -> SpectreResult<Stmt> {
+    fn parse_const(&mut self) -> NebulaResult<Stmt> {
         self.expect(TokenKind::Perm)?;
         let name = self.expect_identifier()?;
         let ty = if self.match_token(&TokenKind::Colon) {
@@ -215,7 +215,7 @@ impl Parser {
         let value = self.parse_expression()?;
         Ok(Stmt::Const { name, ty, value })
     }
-    fn parse_if(&mut self) -> SpectreResult<Stmt> {
+    fn parse_if(&mut self) -> NebulaResult<Stmt> {
         self.expect(TokenKind::If)?;
         let condition = self.parse_expression()?;
         self.expect(TokenKind::Do)?;
@@ -240,7 +240,7 @@ impl Parser {
             else_block,
         })
     }
-    fn parse_while(&mut self) -> SpectreResult<Stmt> {
+    fn parse_while(&mut self) -> NebulaResult<Stmt> {
         self.expect(TokenKind::While)?;
         let condition = self.parse_expression()?;
         self.expect(TokenKind::Do)?;
@@ -248,7 +248,7 @@ impl Parser {
         self.expect(TokenKind::End)?;
         Ok(Stmt::While { condition, body })
     }
-    fn parse_for(&mut self) -> SpectreResult<Stmt> {
+    fn parse_for(&mut self) -> NebulaResult<Stmt> {
         self.expect(TokenKind::For)?;
         let var = self.expect_identifier()?;
         self.expect(TokenKind::Assign)?;
@@ -265,7 +265,7 @@ impl Parser {
         self.expect(TokenKind::End)?;
         Ok(Stmt::For { var, start, end, step, body })
     }
-    fn parse_each(&mut self) -> SpectreResult<Stmt> {
+    fn parse_each(&mut self) -> NebulaResult<Stmt> {
         self.expect(TokenKind::Each)?;
         let var = self.expect_identifier()?;
         self.expect(TokenKind::In)?;
@@ -275,7 +275,7 @@ impl Parser {
         self.expect(TokenKind::End)?;
         Ok(Stmt::Each { var, iterator, body })
     }
-    fn parse_match(&mut self) -> SpectreResult<Stmt> {
+    fn parse_match(&mut self) -> NebulaResult<Stmt> {
         self.expect(TokenKind::Match)?;
         let value = self.parse_expression()?;
         self.expect(TokenKind::Do)?;
@@ -291,7 +291,7 @@ impl Parser {
         self.expect(TokenKind::End)?;
         Ok(Stmt::Match { value, arms })
     }
-    fn parse_pattern(&mut self) -> SpectreResult<Pattern> {
+    fn parse_pattern(&mut self) -> NebulaResult<Pattern> {
         match &self.peek().kind {
             TokenKind::Identifier(name) if name == "_" => {
                 self.advance();
@@ -325,13 +325,13 @@ impl Parser {
                 self.advance();
                 Ok(Pattern::Literal(Literal::Bool(false)))
             }
-            _ => Err(SpectreError::Parse {
+            _ => Err(NebulaError::Parse {
                 message: "Expected pattern".to_string(),
                 span: self.peek().span,
             })
         }
     }
-    fn parse_try(&mut self) -> SpectreResult<Stmt> {
+    fn parse_try(&mut self) -> NebulaResult<Stmt> {
         self.expect(TokenKind::Try)?;
         self.expect(TokenKind::Do)?;
         let try_block = self.parse_block_until_end()?;
@@ -352,7 +352,7 @@ impl Parser {
         self.expect(TokenKind::End)?;
         Ok(Stmt::Try { try_block, catch_var, catch_block, finally_block })
     }
-    fn parse_return(&mut self) -> SpectreResult<Stmt> {
+    fn parse_return(&mut self) -> NebulaResult<Stmt> {
         if self.check(&TokenKind::Arrow) {
             self.advance();
         } else {
@@ -365,10 +365,10 @@ impl Parser {
         };
         Ok(Stmt::Return(value))
     }
-    pub fn parse_expression(&mut self) -> SpectreResult<Expr> {
+    pub fn parse_expression(&mut self) -> NebulaResult<Expr> {
         self.parse_ternary()
     }
-    fn parse_ternary(&mut self) -> SpectreResult<Expr> {
+    fn parse_ternary(&mut self) -> NebulaResult<Expr> {
         let expr = self.parse_or()?;
         if self.match_token(&TokenKind::Question) {
             let then_expr = self.parse_expression()?;
@@ -382,7 +382,7 @@ impl Parser {
         }
         Ok(expr)
     }
-    fn parse_or(&mut self) -> SpectreResult<Expr> {
+    fn parse_or(&mut self) -> NebulaResult<Expr> {
         let mut left = self.parse_and()?;
         while self.check(&TokenKind::Pipe) && !self.check_next(&TokenKind::Pipe) {
             self.advance();
@@ -395,7 +395,7 @@ impl Parser {
         }
         Ok(left)
     }
-    fn parse_and(&mut self) -> SpectreResult<Expr> {
+    fn parse_and(&mut self) -> NebulaResult<Expr> {
         let mut left = self.parse_not()?;
         while self.check(&TokenKind::Ampersand) {
             self.advance();
@@ -408,7 +408,7 @@ impl Parser {
         }
         Ok(left)
     }
-    fn parse_not(&mut self) -> SpectreResult<Expr> {
+    fn parse_not(&mut self) -> NebulaResult<Expr> {
         if self.match_token(&TokenKind::Bang) {
             let operand = self.parse_not()?;
             Ok(Expr::Unary {
@@ -419,7 +419,7 @@ impl Parser {
             self.parse_comparison()
         }
     }
-    fn parse_comparison(&mut self) -> SpectreResult<Expr> {
+    fn parse_comparison(&mut self) -> NebulaResult<Expr> {
         let mut left = self.parse_bitor()?;
         loop {
             let op = match &self.peek().kind {
@@ -441,7 +441,7 @@ impl Parser {
         }
         Ok(left)
     }
-    fn parse_bitor(&mut self) -> SpectreResult<Expr> {
+    fn parse_bitor(&mut self) -> NebulaResult<Expr> {
         let mut left = self.parse_bitxor()?;
         while self.match_token(&TokenKind::Pipe) {
             let right = self.parse_bitxor()?;
@@ -453,7 +453,7 @@ impl Parser {
         }
         Ok(left)
     }
-    fn parse_bitxor(&mut self) -> SpectreResult<Expr> {
+    fn parse_bitxor(&mut self) -> NebulaResult<Expr> {
         let mut left = self.parse_bitand()?;
         while self.match_token(&TokenKind::CaretPipe) {
             let right = self.parse_bitand()?;
@@ -465,7 +465,7 @@ impl Parser {
         }
         Ok(left)
     }
-    fn parse_bitand(&mut self) -> SpectreResult<Expr> {
+    fn parse_bitand(&mut self) -> NebulaResult<Expr> {
         let mut left = self.parse_shift()?;
         while self.match_token(&TokenKind::Ampersand) {
             let right = self.parse_shift()?;
@@ -477,7 +477,7 @@ impl Parser {
         }
         Ok(left)
     }
-    fn parse_shift(&mut self) -> SpectreResult<Expr> {
+    fn parse_shift(&mut self) -> NebulaResult<Expr> {
         let mut left = self.parse_range()?;
         loop {
             let op = match &self.peek().kind {
@@ -495,7 +495,7 @@ impl Parser {
         }
         Ok(left)
     }
-    fn parse_range(&mut self) -> SpectreResult<Expr> {
+    fn parse_range(&mut self) -> NebulaResult<Expr> {
         let left = self.parse_additive()?;
         if self.match_token(&TokenKind::DotDot) {
             let right = self.parse_additive()?;
@@ -515,7 +515,7 @@ impl Parser {
         }
         Ok(left)
     }
-    fn parse_additive(&mut self) -> SpectreResult<Expr> {
+    fn parse_additive(&mut self) -> NebulaResult<Expr> {
         let mut left = self.parse_multiplicative()?;
         loop {
             let op = match &self.peek().kind {
@@ -533,7 +533,7 @@ impl Parser {
         }
         Ok(left)
     }
-    fn parse_multiplicative(&mut self) -> SpectreResult<Expr> {
+    fn parse_multiplicative(&mut self) -> NebulaResult<Expr> {
         let mut left = self.parse_power()?;
         loop {
             let op = match &self.peek().kind {
@@ -552,7 +552,7 @@ impl Parser {
         }
         Ok(left)
     }
-    fn parse_power(&mut self) -> SpectreResult<Expr> {
+    fn parse_power(&mut self) -> NebulaResult<Expr> {
         let left = self.parse_unary()?;
         if self.match_token(&TokenKind::Caret) {
             let right = self.parse_power()?; 
@@ -564,7 +564,7 @@ impl Parser {
         }
         Ok(left)
     }
-    fn parse_unary(&mut self) -> SpectreResult<Expr> {
+    fn parse_unary(&mut self) -> NebulaResult<Expr> {
         match &self.peek().kind {
             TokenKind::Minus => {
                 self.advance();
@@ -610,7 +610,7 @@ impl Parser {
             _ => self.parse_postfix(),
         }
     }
-    fn parse_postfix(&mut self) -> SpectreResult<Expr> {
+    fn parse_postfix(&mut self) -> NebulaResult<Expr> {
         let mut expr = self.parse_primary()?;
         loop {
             match &self.peek().kind {
@@ -691,7 +691,7 @@ impl Parser {
             matches!(&self.tokens[self.current + 1].kind, TokenKind::Identifier(_))
         }
     }
-    fn parse_args(&mut self) -> SpectreResult<Vec<Expr>> {
+    fn parse_args(&mut self) -> NebulaResult<Vec<Expr>> {
         let mut args = Vec::new();
         if !self.check(&TokenKind::RightParen) {
             loop {
@@ -703,7 +703,7 @@ impl Parser {
         }
         Ok(args)
     }
-    fn parse_primary(&mut self) -> SpectreResult<Expr> {
+    fn parse_primary(&mut self) -> NebulaResult<Expr> {
         match self.peek().kind.clone() {
             TokenKind::Integer(n) => {
                 self.advance();
@@ -814,7 +814,7 @@ impl Parser {
                             if let Expr::Variable(name) = e {
                                 Ok(name.clone())
                             } else {
-                                Err(SpectreError::Parse {
+                                Err(NebulaError::Parse {
                                     message: "Lambda parameters must be identifiers".to_string(),
                                     span: self.peek().span,
                                 })
@@ -840,13 +840,13 @@ impl Parser {
                 }
                 Ok(first) 
             }
-            _ => Err(SpectreError::Parse {
+            _ => Err(NebulaError::Parse {
                 message: format!("Unexpected token: {:?}", self.peek().kind),
                 span: self.peek().span,
             }),
         }
     }
-    pub fn parse_type(&mut self) -> SpectreResult<Type> {
+    pub fn parse_type(&mut self) -> NebulaResult<Type> {
         let base_type = match &self.peek().kind {
             TokenKind::Nb => { self.advance(); Type::Nb }
             TokenKind::Int => { self.advance(); Type::Int }
@@ -878,7 +878,7 @@ impl Parser {
                 self.advance();
                 Type::Named(name)
             }
-            _ => return Err(SpectreError::Parse {
+            _ => return Err(NebulaError::Parse {
                 message: format!("Expected type, got {:?}", self.peek().kind),
                 span: self.peek().span,
             }),
@@ -920,24 +920,24 @@ impl Parser {
             false
         }
     }
-    fn expect(&mut self, kind: TokenKind) -> SpectreResult<&Token> {
+    fn expect(&mut self, kind: TokenKind) -> NebulaResult<&Token> {
         if self.check(&kind) {
             Ok(self.advance())
         } else {
-            Err(SpectreError::Parse {
+            Err(NebulaError::Parse {
                 message: format!("Expected {:?}, got {:?}", kind, self.peek().kind),
                 span: self.peek().span,
             })
         }
     }
-    fn expect_identifier(&mut self) -> SpectreResult<String> {
+    fn expect_identifier(&mut self) -> NebulaResult<String> {
         match &self.peek().kind {
             TokenKind::Identifier(name) => {
                 let name = name.clone();
                 self.advance();
                 Ok(name)
             }
-            _ => Err(SpectreError::Parse {
+            _ => Err(NebulaError::Parse {
                 message: format!("Expected identifier, got {:?}", self.peek().kind),
                 span: self.peek().span,
             }),

@@ -1,4 +1,4 @@
-use crate::error::{SpectreError, SpectreResult};
+use crate::error::{NebulaError, NebulaResult};
 use crate::parser::ast::*;
 use super::types::{Ty, TypeEnv, TypeDef};
 use super::infer::InferCtx;
@@ -13,7 +13,7 @@ impl TypeChecker {
             infer: InferCtx::new(),
         }
     }
-    pub fn check_program(&mut self, program: &Program) -> SpectreResult<()> {
+    pub fn check_program(&mut self, program: &Program) -> NebulaResult<()> {
         for item in &program.items {
             match item {
                 Item::Struct(s) => self.register_struct(s)?,
@@ -36,21 +36,21 @@ impl TypeChecker {
         }
         Ok(())
     }
-    fn register_struct(&mut self, s: &Struct) -> SpectreResult<()> {
+    fn register_struct(&mut self, s: &Struct) -> NebulaResult<()> {
         let fields: Vec<_> = s.fields.iter()
             .map(|f| (f.name.clone(), Ty::from_ast(&f.ty)))
             .collect();
         self.env.define_type(s.name.clone(), TypeDef::Struct(fields));
         Ok(())
     }
-    fn register_enum(&mut self, e: &Enum) -> SpectreResult<()> {
+    fn register_enum(&mut self, e: &Enum) -> NebulaResult<()> {
         let variants: Vec<_> = e.variants.iter()
             .map(|v| (v.name.clone(), v.fields.iter().map(Ty::from_ast).collect()))
             .collect();
         self.env.define_type(e.name.clone(), TypeDef::Enum(variants));
         Ok(())
     }
-    fn register_function(&mut self, f: &Function) -> SpectreResult<()> {
+    fn register_function(&mut self, f: &Function) -> NebulaResult<()> {
         let param_types: Vec<_> = f.params.iter()
             .map(|p| Ty::from_ast(&p.ty))
             .collect();
@@ -61,7 +61,7 @@ impl TypeChecker {
         self.env.define(f.name.clone(), fn_type);
         Ok(())
     }
-    fn check_function(&mut self, f: &Function) -> SpectreResult<()> {
+    fn check_function(&mut self, f: &Function) -> NebulaResult<()> {
         self.env.push_scope();
         for param in &f.params {
             let ty = Ty::from_ast(&param.ty);
@@ -76,7 +76,7 @@ impl TypeChecker {
         self.env.pop_scope();
         Ok(())
     }
-    fn check_impl(&mut self, i: &Impl) -> SpectreResult<()> {
+    fn check_impl(&mut self, i: &Impl) -> NebulaResult<()> {
         for method in &i.methods {
             self.env.push_scope();
             let self_type = Ty::Generic(i.type_name.clone(), vec![]);
@@ -94,7 +94,7 @@ impl TypeChecker {
         }
         Ok(())
     }
-    fn check_stmt(&mut self, stmt: &Stmt) -> SpectreResult<Ty> {
+    fn check_stmt(&mut self, stmt: &Stmt) -> NebulaResult<Ty> {
         match stmt {
             Stmt::Let { name, ty, value, .. } => {
                 let value_type = self.check_expr(value)?;
@@ -102,7 +102,7 @@ impl TypeChecker {
                     .map(Ty::from_ast)
                     .unwrap_or_else(|| self.infer.fresh_var());
                 if !self.infer.unify(&declared_type, &value_type) {
-                    return Err(SpectreError::TypeMismatch {
+                    return Err(NebulaError::TypeMismatch {
                         expected: format!("{:?}", declared_type),
                         got: format!("{:?}", value_type),
                     });
@@ -115,7 +115,7 @@ impl TypeChecker {
                 let target_type = self.check_expr(target)?;
                 let value_type = self.check_expr(value)?;
                 if !self.infer.unify(&target_type, &value_type) {
-                    return Err(SpectreError::TypeMismatch {
+                    return Err(NebulaError::TypeMismatch {
                         expected: format!("{:?}", target_type),
                         got: format!("{:?}", value_type),
                     });
@@ -125,7 +125,7 @@ impl TypeChecker {
             Stmt::If { condition, then_block, elif_branches, else_block } => {
                 let cond_type = self.check_expr(condition)?;
                 if !self.infer.unify(&cond_type, &Ty::Bool) {
-                    return Err(SpectreError::TypeMismatch {
+                    return Err(NebulaError::TypeMismatch {
                         expected: "bool".to_string(),
                         got: format!("{:?}", cond_type),
                     });
@@ -138,7 +138,7 @@ impl TypeChecker {
                 for (elif_cond, elif_body) in elif_branches {
                     let elif_cond_type = self.check_expr(elif_cond)?;
                     if !self.infer.unify(&elif_cond_type, &Ty::Bool) {
-                        return Err(SpectreError::TypeMismatch {
+                        return Err(NebulaError::TypeMismatch {
                             expected: "bool".to_string(),
                             got: format!("{:?}", elif_cond_type),
                         });
@@ -161,7 +161,7 @@ impl TypeChecker {
             Stmt::While { condition, body } => {
                 let cond_type = self.check_expr(condition)?;
                 if !self.infer.unify(&cond_type, &Ty::Bool) {
-                    return Err(SpectreError::TypeMismatch {
+                    return Err(NebulaError::TypeMismatch {
                         expected: "bool".to_string(),
                         got: format!("{:?}", cond_type),
                     });
@@ -208,13 +208,13 @@ impl TypeChecker {
             }
         }
     }
-    fn check_expr(&mut self, expr: &Expr) -> SpectreResult<Ty> {
+    fn check_expr(&mut self, expr: &Expr) -> NebulaResult<Ty> {
         match expr {
             Expr::Literal(lit) => Ok(self.literal_type(lit)),
             Expr::Variable(name) => {
                 self.env.lookup(name)
                     .cloned()
-                    .ok_or_else(|| SpectreError::UndefinedVariable { name: name.clone() })
+                    .ok_or_else(|| NebulaError::UndefinedVariable { name: name.clone() })
             }
             Expr::Binary { left, op, right } => {
                 let left_type = self.check_expr(left)?;
@@ -222,7 +222,7 @@ impl TypeChecker {
                 match op {
                     BinaryOp::Add | BinaryOp::Sub | BinaryOp::Mul | BinaryOp::Div | BinaryOp::Mod => {
                         if !self.infer.unify(&left_type, &right_type) {
-                            return Err(SpectreError::TypeMismatch {
+                            return Err(NebulaError::TypeMismatch {
                                 expected: format!("{:?}", left_type),
                                 got: format!("{:?}", right_type),
                             });
@@ -232,7 +232,7 @@ impl TypeChecker {
                     BinaryOp::Eq | BinaryOp::Ne | BinaryOp::Lt | BinaryOp::Gt | 
                     BinaryOp::Le | BinaryOp::Ge => {
                         if !self.infer.unify(&left_type, &right_type) {
-                            return Err(SpectreError::TypeMismatch {
+                            return Err(NebulaError::TypeMismatch {
                                 expected: format!("{:?}", left_type),
                                 got: format!("{:?}", right_type),
                             });
@@ -241,13 +241,13 @@ impl TypeChecker {
                     }
                     BinaryOp::And | BinaryOp::Or => {
                         if !self.infer.unify(&left_type, &Ty::Bool) {
-                            return Err(SpectreError::TypeMismatch {
+                            return Err(NebulaError::TypeMismatch {
                                 expected: "bool".to_string(),
                                 got: format!("{:?}", left_type),
                             });
                         }
                         if !self.infer.unify(&right_type, &Ty::Bool) {
-                            return Err(SpectreError::TypeMismatch {
+                            return Err(NebulaError::TypeMismatch {
                                 expected: "bool".to_string(),
                                 got: format!("{:?}", right_type),
                             });
@@ -257,7 +257,7 @@ impl TypeChecker {
                     BinaryOp::BitAnd | BinaryOp::BitOr | BinaryOp::BitXor |
                     BinaryOp::Shl | BinaryOp::Shr => {
                         if !self.infer.unify(&left_type, &right_type) {
-                            return Err(SpectreError::TypeMismatch {
+                            return Err(NebulaError::TypeMismatch {
                                 expected: format!("{:?}", left_type),
                                 got: format!("{:?}", right_type),
                             });
@@ -272,7 +272,7 @@ impl TypeChecker {
                     UnaryOp::Neg => Ok(operand_type),
                     UnaryOp::Not => {
                         if !self.infer.unify(&operand_type, &Ty::Bool) {
-                            return Err(SpectreError::TypeMismatch {
+                            return Err(NebulaError::TypeMismatch {
                                 expected: "bool".to_string(),
                                 got: format!("{:?}", operand_type),
                             });
@@ -287,14 +287,14 @@ impl TypeChecker {
                 match callee_type {
                     Ty::Function(params, ret) => {
                         if params.len() != args.len() {
-                            return Err(SpectreError::InvalidOperation {
+                            return Err(NebulaError::InvalidOperation {
                                 message: format!("Expected {} arguments, got {}", params.len(), args.len()),
                             });
                         }
                         for (param_type, arg) in params.iter().zip(args.iter()) {
                             let arg_type = self.check_expr(arg)?;
                             if !self.infer.unify(param_type, &arg_type) {
-                                return Err(SpectreError::TypeMismatch {
+                                return Err(NebulaError::TypeMismatch {
                                     expected: format!("{:?}", param_type),
                                     got: format!("{:?}", arg_type),
                                 });
@@ -302,7 +302,7 @@ impl TypeChecker {
                         }
                         Ok(*ret)
                     }
-                    _ => Err(SpectreError::InvalidOperation {
+                    _ => Err(NebulaError::InvalidOperation {
                         message: "Cannot call non-function".to_string(),
                     })
                 }
@@ -315,7 +315,7 @@ impl TypeChecker {
                 for elem in &elements[1..] {
                     let elem_type = self.check_expr(elem)?;
                     if !self.infer.unify(&first_type, &elem_type) {
-                        return Err(SpectreError::TypeMismatch {
+                        return Err(NebulaError::TypeMismatch {
                             expected: format!("{:?}", first_type),
                             got: format!("{:?}", elem_type),
                         });
@@ -345,7 +345,7 @@ impl TypeChecker {
                 let array_type = self.check_expr(array)?;
                 let index_type = self.check_expr(index)?;
                 if !index_type.is_integer() && !matches!(index_type, Ty::Var(_)) {
-                    return Err(SpectreError::TypeMismatch {
+                    return Err(NebulaError::TypeMismatch {
                         expected: "integer".to_string(),
                         got: format!("{:?}", index_type),
                     });

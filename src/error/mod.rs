@@ -1,6 +1,6 @@
 use thiserror::Error;
 use crate::lexer::Span;
-pub type SpectreResult<T> = Result<T, SpectreError>;
+pub type NebulaResult<T> = Result<T, NebulaError>;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ErrorCode {
     E001, 
@@ -75,7 +75,7 @@ impl ErrorCode {
     }
 }
 #[derive(Error, Debug, Clone)]
-pub enum SpectreError {
+pub enum NebulaError {
     #[error("[{code}] {msg}")]
     Coded { 
         code: ErrorCode,
@@ -101,7 +101,7 @@ pub enum SpectreError {
     #[error("IO error: {message}")]
     Io { message: String },
 }
-impl SpectreError {
+impl NebulaError {
     pub fn coded(code: ErrorCode, detail: impl Into<String>) -> Self {
         let detail = detail.into();
         let msg = if detail.is_empty() {
@@ -109,7 +109,7 @@ impl SpectreError {
         } else {
             format!("{}: {}", code.message(), detail)
         };
-        SpectreError::Coded { code, msg, span: None }
+        NebulaError::Coded { code, msg, span: None }
     }
     pub fn coded_at(code: ErrorCode, detail: impl Into<String>, span: Span) -> Self {
         let detail = detail.into();
@@ -118,38 +118,38 @@ impl SpectreError {
         } else {
             format!("{}: {}", code.message(), detail)
         };
-        SpectreError::Coded { code, msg, span: Some(span) }
+        NebulaError::Coded { code, msg, span: Some(span) }
     }
     pub fn span(&self) -> Option<&Span> {
         match self {
-            SpectreError::Coded { span, .. } => span.as_ref(),
-            SpectreError::Lexer { span, .. } => Some(span),
-            SpectreError::Parse { span, .. } => Some(span),
-            SpectreError::Type { span, .. } => Some(span),
+            NebulaError::Coded { span, .. } => span.as_ref(),
+            NebulaError::Lexer { span, .. } => Some(span),
+            NebulaError::Parse { span, .. } => Some(span),
+            NebulaError::Type { span, .. } => Some(span),
             _ => None,
         }
     }
     pub fn message(&self) -> String {
         match self {
-            SpectreError::Coded { msg, .. } => msg.clone(),
-            SpectreError::Lexer { message, .. } => message.clone(),
-            SpectreError::Parse { message, .. } => message.clone(),
-            SpectreError::Type { message, .. } => message.clone(),
-            SpectreError::Runtime { message } => message.clone(),
-            SpectreError::UndefinedVariable { name } => format!("variable not found: {}", name),
-            SpectreError::IndexOutOfBounds { index, length } => 
+            NebulaError::Coded { msg, .. } => msg.clone(),
+            NebulaError::Lexer { message, .. } => message.clone(),
+            NebulaError::Parse { message, .. } => message.clone(),
+            NebulaError::Type { message, .. } => message.clone(),
+            NebulaError::Runtime { message } => message.clone(),
+            NebulaError::UndefinedVariable { name } => format!("variable not found: {}", name),
+            NebulaError::IndexOutOfBounds { index, length } => 
                 format!("out of bounds: {} (len {})", index, length),
-            SpectreError::DivisionByZero => "divide by zero".to_string(),
-            SpectreError::InvalidOperation { message } => message.clone(),
-            SpectreError::Io { message } => message.clone(),
+            NebulaError::DivisionByZero => "divide by zero".to_string(),
+            NebulaError::InvalidOperation { message } => message.clone(),
+            NebulaError::Io { message } => message.clone(),
         }
     }
     pub fn code(&self) -> Option<ErrorCode> {
         match self {
-            SpectreError::Coded { code, .. } => Some(*code),
-            SpectreError::UndefinedVariable { .. } => Some(ErrorCode::E010),
-            SpectreError::IndexOutOfBounds { .. } => Some(ErrorCode::E020),
-            SpectreError::DivisionByZero => Some(ErrorCode::E040),
+            NebulaError::Coded { code, .. } => Some(*code),
+            NebulaError::UndefinedVariable { .. } => Some(ErrorCode::E010),
+            NebulaError::IndexOutOfBounds { .. } => Some(ErrorCode::E020),
+            NebulaError::DivisionByZero => Some(ErrorCode::E040),
             _ => None,
         }
     }

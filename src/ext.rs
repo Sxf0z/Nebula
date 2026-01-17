@@ -1,5 +1,5 @@
 use crate::interp::Value;
-use crate::error::{SpectreError, SpectreResult, ErrorCode};
+use crate::error::{NebulaError, NebulaResult, ErrorCode};
 pub type ExtResult<T> = Result<T, ExtError>;
 #[derive(Debug, Clone)]
 pub struct ExtError {
@@ -10,9 +10,9 @@ impl ExtError {
         Self { message: msg.into() }
     }
 }
-impl From<ExtError> for SpectreError {
+impl From<ExtError> for NebulaError {
     fn from(e: ExtError) -> Self {
-        SpectreError::coded(ErrorCode::E080, e.message)
+        NebulaError::coded(ErrorCode::E080, e.message)
     }
 }
 pub struct ExtensionContext<'a> {
@@ -99,9 +99,9 @@ impl ExtensionRegistry {
     pub fn get_function(&self, name: &str) -> Option<&ExtFunction> {
         self.functions.get(name)
     }
-    pub fn call(&self, name: &str, args: &[Value]) -> SpectreResult<Value> {
+    pub fn call(&self, name: &str, args: &[Value]) -> NebulaResult<Value> {
         let func = self.functions.get(name)
-            .ok_or_else(|| SpectreError::coded(ErrorCode::E010, name))?;
+            .ok_or_else(|| NebulaError::coded(ErrorCode::E010, name))?;
         func.validate_args(args.len())?;
         let ctx = ExtensionContext::new(name, args.len());
         (func.func)(&ctx, args).map_err(|e| e.into())

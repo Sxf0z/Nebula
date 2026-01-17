@@ -5,7 +5,7 @@ pub mod interp;
 pub mod builtins;
 pub mod vm;
 pub mod ext;
-pub use error::{SpectreError, SpectreResult, ErrorCode};
+pub use error::{NebulaError, NebulaResult, ErrorCode};
 pub use lexer::{Lexer, Token, TokenKind, Span};
 pub use parser::{Parser, Program};
 pub use interp::{Interpreter, Value, Environment};

@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::rc::Rc;
 use std::cell::RefCell;
-use crate::error::{SpectreError, SpectreResult, ErrorCode};
+use crate::error::{NebulaError, NebulaResult, ErrorCode};
 use crate::parser::ast::*;
 use super::value::{Value, FunctionValue, LambdaValue, NativeFn};
 use super::env::Environment;
@@ -12,11 +12,11 @@ enum ControlFlow {
 }
 type EvalResult = Result<Value, EvalError>;
 enum EvalError {
-    Error(SpectreError),
+    Error(NebulaError),
     Control(ControlFlow),
 }
-impl From<SpectreError> for EvalError {
-    fn from(e: SpectreError) -> Self {
+impl From<NebulaError> for EvalError {
+    fn from(e: NebulaError) -> Self {
         EvalError::Error(e)
     }
 }
@@ -255,7 +255,7 @@ impl Interpreter {
     pub fn reset_scope(&mut self) {
         self.current = Rc::clone(&self.global);
     }
-    pub fn interpret(&mut self, program: &Program) -> SpectreResult<Value> {
+    pub fn interpret(&mut self, program: &Program) -> NebulaResult<Value> {
         let mut result = Value::Nil;
         for item in &program.items {
             match item {
@@ -341,7 +341,7 @@ impl Interpreter {
                 loop {
                     self.iteration_count += 1;
                     if self.iteration_count > MAX_ITERATIONS {
-                        return Err(SpectreError::coded(ErrorCode::E071, "while loop").into());
+                        return Err(NebulaError::coded(ErrorCode::E071, "while loop").into());
                     }
                     let cond = self.eval_expr(condition)?;
                     if !cond.is_truthy() {
@@ -358,12 +358,12 @@ impl Interpreter {
             }
             Stmt::For { var, start, end, step, body } => {
                 let start_val = self.eval_expr(start)?.as_integer()
-                    .ok_or(EvalError::Error(SpectreError::Runtime { message: "for loop start must be integer".to_string() }))?;
+                    .ok_or(EvalError::Error(NebulaError::Runtime { message: "for loop start must be integer".to_string() }))?;
                 let end_val = self.eval_expr(end)?.as_integer()
-                    .ok_or(EvalError::Error(SpectreError::Runtime { message: "for loop end must be integer".to_string() }))?;
+                    .ok_or(EvalError::Error(NebulaError::Runtime { message: "for loop end must be integer".to_string() }))?;
                 let step_val = if let Some(s) = step {
                     self.eval_expr(s)?.as_integer()
-                        .ok_or(EvalError::Error(SpectreError::Runtime { message: "for loop step must be integer".to_string() }))?
+                        .ok_or(EvalError::Error(NebulaError::Runtime { message: "for loop step must be integer".to_string() }))?
                 } else {
                     1
                 };
@@ -371,7 +371,7 @@ impl Interpreter {
                 while (step_val > 0 && i <= end_val) || (step_val < 0 && i >= end_val) {
                     self.iteration_count += 1;
                     if self.iteration_count > MAX_ITERATIONS {
-                        return Err(SpectreError::coded(ErrorCode::E071, "for loop").into());
+                        return Err(NebulaError::coded(ErrorCode::E071, "for loop").into());
                     }
                     self.push_scope();
                     self.current.borrow_mut().define(var.clone(), Value::Integer(i));
@@ -411,7 +411,7 @@ impl Interpreter {
                         m.keys().map(|k| Value::String(k.clone())).collect()
                     }
                     _ => {
-                        return Err(SpectreError::InvalidOperation {
+                        return Err(NebulaError::InvalidOperation {
                             message: format!("Cannot iterate over {}", iter_val.type_name()),
                         }.into());
                     }
@@ -445,7 +445,7 @@ impl Interpreter {
                         return self.eval_expr(&arm.body);
                     }
                 }
-                Err(SpectreError::Runtime {
+                Err(NebulaError::Runtime {
                     message: "Non-exhaustive match".to_string(),
                 }.into())
             }
@@ -503,20 +503,20 @@ impl Interpreter {
         match target {
             Expr::Variable(name) => {
                 if !self.current.borrow_mut().assign(name, value) {
-                    return Err(SpectreError::UndefinedVariable { name: name.clone() }.into());
+                    return Err(NebulaError::UndefinedVariable { name: name.clone() }.into());
                 }
                 Ok(Value::Nil)
             }
             Expr::Index { array, index } => {
                 if let Expr::Variable(arr_name) = array.as_ref() {
                     let idx = self.eval_expr(index)?.as_integer()
-                        .ok_or(EvalError::Error(SpectreError::InvalidOperation { message: "Index must be integer".to_string() }))?;
+                        .ok_or(EvalError::Error(NebulaError::InvalidOperation { message: "Index must be integer".to_string() }))?;
                     if let Some(Value::List(mut arr)) = self.current.borrow().get(arr_name) {
                         if idx >= 0 && (idx as usize) < arr.len() {
                             arr[idx as usize] = value;
                             self.current.borrow_mut().assign(arr_name, Value::List(arr));
                         } else {
-                            return Err(SpectreError::IndexOutOfBounds { index: idx, length: arr.len() }.into());
+                            return Err(NebulaError::IndexOutOfBounds { index: idx, length: arr.len() }.into());
                         }
                     }
                 }
@@ -532,7 +532,7 @@ impl Interpreter {
                 Ok(Value::Nil)
             }
             _ => {
-                Err(SpectreError::InvalidOperation {
+                Err(NebulaError::InvalidOperation {
                     message: "Invalid assignment target".to_string(),
                 }.into())
             }
@@ -556,7 +556,7 @@ impl Interpreter {
             Expr::Literal(lit) => Ok(self.eval_literal(lit)),
             Expr::Variable(name) => {
                 self.current.borrow().get(name)
-                    .ok_or_else(|| SpectreError::UndefinedVariable { name: name.clone() }.into())
+                    .ok_or_else(|| NebulaError::UndefinedVariable { name: name.clone() }.into())
             }
             Expr::Binary { left, op, right } => {
                 let lhs = self.eval_expr(left)?;
@@ -579,14 +579,14 @@ impl Interpreter {
                     Value::NativeFunction(nf) => {
                         if let Some(arity) = nf.arity {
                             if arg_vals.len() != arity {
-                                return Err(SpectreError::InvalidOperation {
+                                return Err(NebulaError::InvalidOperation {
                                     message: format!("{}() expected {} arguments, got {}", nf.name, arity, arg_vals.len()),
                                 }.into());
                             }
                         }
-                        (nf.func)(&arg_vals).map_err(|msg| SpectreError::Runtime { message: msg }.into())
+                        (nf.func)(&arg_vals).map_err(|msg| NebulaError::Runtime { message: msg }.into())
                     }
-                    _ => Err(SpectreError::InvalidOperation {
+                    _ => Err(NebulaError::InvalidOperation {
                         message: format!("Cannot call {}", callee_val.type_name()),
                     }.into()),
                 }
@@ -626,7 +626,7 @@ impl Interpreter {
                         let e = end_idx.map(|i| i as usize).unwrap_or(chars.len()).min(chars.len());
                         Ok(Value::String(chars[s..e].iter().collect()))
                     }
-                    _ => Err(SpectreError::InvalidOperation {
+                    _ => Err(NebulaError::InvalidOperation {
                         message: format!("Cannot slice {}", arr.type_name()),
                     }.into()),
                 }
@@ -673,9 +673,9 @@ impl Interpreter {
             }
             Expr::Range { start, end, inclusive } => {
                 let s = self.eval_expr(start)?.as_integer()
-                    .ok_or(EvalError::Error(SpectreError::InvalidOperation { message: "Range start must be integer".to_string() }))?;
+                    .ok_or(EvalError::Error(NebulaError::InvalidOperation { message: "Range start must be integer".to_string() }))?;
                 let e = self.eval_expr(end)?.as_integer()
-                    .ok_or(EvalError::Error(SpectreError::InvalidOperation { message: "Range end must be integer".to_string() }))?;
+                    .ok_or(EvalError::Error(NebulaError::InvalidOperation { message: "Range end must be integer".to_string() }))?;
                 Ok(Value::Range(s, e, *inclusive))
             }
             Expr::StructInit { name, args } => {
@@ -693,7 +693,7 @@ impl Interpreter {
                     Value::List(arr) => Ok(Value::Integer(arr.len() as i64)),
                     Value::String(s) => Ok(Value::Integer(s.len() as i64)),
                     Value::Map(m) => Ok(Value::Integer(m.len() as i64)),
-                    _ => Err(SpectreError::InvalidOperation {
+                    _ => Err(NebulaError::InvalidOperation {
                         message: format!("Cannot get length of {}", val.type_name()),
                     }.into()),
                 }
@@ -701,7 +701,7 @@ impl Interpreter {
             Expr::Append { list, value } => {
                 let mut arr = match self.eval_expr(list)? {
                     Value::List(a) => a,
-                    other => return Err(SpectreError::InvalidOperation {
+                    other => return Err(NebulaError::InvalidOperation {
                         message: format!("Cannot append to {}", other.type_name()),
                     }.into()),
                 };
@@ -713,7 +713,7 @@ impl Interpreter {
             Expr::Spawn(operand) => self.eval_expr(operand),
             Expr::Error(msg) => {
                 let message = self.eval_expr(msg)?.to_display_string();
-                Err(SpectreError::Runtime { message }.into())
+                Err(NebulaError::Runtime { message }.into())
             }
             Expr::Assert { condition, message } => {
                 let cond = self.eval_expr(condition)?;
@@ -723,7 +723,7 @@ impl Interpreter {
                     } else {
                         "Assertion failed".to_string()
                     };
-                    return Err(SpectreError::Runtime { message: msg }.into());
+                    return Err(NebulaError::Runtime { message: msg }.into());
                 }
                 Ok(Value::Nil)
             }
@@ -733,16 +733,16 @@ impl Interpreter {
                     ch.borrow_mut().push(val);
                     Ok(Value::Nil)
                 } else {
-                    Err(SpectreError::InvalidOperation { message: "Send requires channel".to_string() }.into())
+                    Err(NebulaError::InvalidOperation { message: "Send requires channel".to_string() }.into())
                 }
             }
             Expr::Receive(channel) => {
                 if let Value::Channel(ch) = self.eval_expr(channel)? {
-                    ch.borrow_mut().pop().ok_or(SpectreError::Runtime {
+                    ch.borrow_mut().pop().ok_or(NebulaError::Runtime {
                         message: "Channel empty".to_string()
                     }.into())
                 } else {
-                    Err(SpectreError::InvalidOperation { message: "Receive requires channel".to_string() }.into())
+                    Err(NebulaError::InvalidOperation { message: "Receive requires channel".to_string() }.into())
                 }
             }
             Expr::Borrow(operand) => self.eval_expr(operand),
@@ -796,7 +796,7 @@ impl Interpreter {
             (Value::String(a), Value::String(b)) => Ok(Value::String(format!("{}{}", a, b))),
             (Value::String(a), other) => Ok(Value::String(format!("{}{}", a, other))),
             (other, Value::String(b)) => Ok(Value::String(format!("{}{}", other, b))),
-            _ => Err(SpectreError::InvalidOperation {
+            _ => Err(NebulaError::InvalidOperation {
                 message: format!("Cannot add {} and {}", lhs.type_name(), rhs.type_name()),
             }.into()),
         }
@@ -807,7 +807,7 @@ impl Interpreter {
             (Value::Integer(a), Value::Integer(b)) => Ok(Value::Integer(a - b)),
             (Value::Number(a), Value::Integer(b)) => Ok(Value::Number(a - (*b as f64))),
             (Value::Integer(a), Value::Number(b)) => Ok(Value::Number((*a as f64) - b)),
-            _ => Err(SpectreError::InvalidOperation {
+            _ => Err(NebulaError::InvalidOperation {
                 message: format!("Cannot subtract {} and {}", lhs.type_name(), rhs.type_name()),
             }.into()),
         }
@@ -818,7 +818,7 @@ impl Interpreter {
             (Value::Integer(a), Value::Integer(b)) => Ok(Value::Integer(a * b)),
             (Value::Number(a), Value::Integer(b)) => Ok(Value::Number(a * (*b as f64))),
             (Value::Integer(a), Value::Number(b)) => Ok(Value::Number((*a as f64) * b)),
-            _ => Err(SpectreError::InvalidOperation {
+            _ => Err(NebulaError::InvalidOperation {
                 message: format!("Cannot multiply {} and {}", lhs.type_name(), rhs.type_name()),
             }.into()),
         }
@@ -826,14 +826,14 @@ impl Interpreter {
     fn divide(&self, lhs: &Value, rhs: &Value) -> EvalResult {
         match (lhs, rhs) {
             (Value::Number(a), Value::Number(b)) => {
-                if *b == 0.0 { Err(SpectreError::DivisionByZero.into()) }
+                if *b == 0.0 { Err(NebulaError::DivisionByZero.into()) }
                 else { Ok(Value::Number(a / b)) }
             }
             (Value::Integer(a), Value::Integer(b)) => {
-                if *b == 0 { Err(SpectreError::DivisionByZero.into()) }
+                if *b == 0 { Err(NebulaError::DivisionByZero.into()) }
                 else { Ok(Value::Integer(a / b)) }
             }
-            _ => Err(SpectreError::InvalidOperation {
+            _ => Err(NebulaError::InvalidOperation {
                 message: format!("Cannot divide {} by {}", lhs.type_name(), rhs.type_name()),
             }.into()),
         }
@@ -842,21 +842,21 @@ impl Interpreter {
         match (lhs, rhs) {
             (Value::Number(a), Value::Number(b)) => Ok(Value::Number(a % b)),
             (Value::Integer(a), Value::Integer(b)) => {
-                if *b == 0 { Err(SpectreError::DivisionByZero.into()) }
+                if *b == 0 { Err(NebulaError::DivisionByZero.into()) }
                 else { Ok(Value::Integer(a % b)) }
             }
             (Value::Number(a), Value::Integer(b)) => Ok(Value::Number(a % (*b as f64))),
             (Value::Integer(a), Value::Number(b)) => Ok(Value::Number((*a as f64) % b)),
-            _ => Err(SpectreError::InvalidOperation {
+            _ => Err(NebulaError::InvalidOperation {
                 message: format!("Cannot modulo {} and {}", lhs.type_name(), rhs.type_name()),
             }.into()),
         }
     }
     fn power(&self, lhs: &Value, rhs: &Value) -> EvalResult {
-        let base = lhs.as_number().ok_or(EvalError::Error(SpectreError::InvalidOperation {
+        let base = lhs.as_number().ok_or(EvalError::Error(NebulaError::InvalidOperation {
             message: "Power requires numbers".to_string(),
         }))?;
-        let exp = rhs.as_number().ok_or(EvalError::Error(SpectreError::InvalidOperation {
+        let exp = rhs.as_number().ok_or(EvalError::Error(NebulaError::InvalidOperation {
             message: "Power requires numbers".to_string(),
         }))?;
         Ok(Value::Number(base.powf(exp)))
@@ -866,7 +866,7 @@ impl Interpreter {
             (Value::Number(a), Value::Number(b)) => Ok(Value::Bool(a < b)),
             (Value::Integer(a), Value::Integer(b)) => Ok(Value::Bool(a < b)),
             (Value::String(a), Value::String(b)) => Ok(Value::Bool(a < b)),
-            _ => Err(SpectreError::InvalidOperation {
+            _ => Err(NebulaError::InvalidOperation {
                 message: format!("Cannot compare {} and {}", lhs.type_name(), rhs.type_name()),
             }.into()),
         }
@@ -876,7 +876,7 @@ impl Interpreter {
             (Value::Number(a), Value::Number(b)) => Ok(Value::Bool(a > b)),
             (Value::Integer(a), Value::Integer(b)) => Ok(Value::Bool(a > b)),
             (Value::String(a), Value::String(b)) => Ok(Value::Bool(a > b)),
-            _ => Err(SpectreError::InvalidOperation {
+            _ => Err(NebulaError::InvalidOperation {
                 message: format!("Cannot compare {} and {}", lhs.type_name(), rhs.type_name()),
             }.into()),
         }
@@ -886,7 +886,7 @@ impl Interpreter {
             (Value::Number(a), Value::Number(b)) => Ok(Value::Bool(a <= b)),
             (Value::Integer(a), Value::Integer(b)) => Ok(Value::Bool(a <= b)),
             (Value::String(a), Value::String(b)) => Ok(Value::Bool(a <= b)),
-            _ => Err(SpectreError::InvalidOperation {
+            _ => Err(NebulaError::InvalidOperation {
                 message: format!("Cannot compare {} and {}", lhs.type_name(), rhs.type_name()),
             }.into()),
         }
@@ -896,7 +896,7 @@ impl Interpreter {
             (Value::Number(a), Value::Number(b)) => Ok(Value::Bool(a >= b)),
             (Value::Integer(a), Value::Integer(b)) => Ok(Value::Bool(a >= b)),
             (Value::String(a), Value::String(b)) => Ok(Value::Bool(a >= b)),
-            _ => Err(SpectreError::InvalidOperation {
+            _ => Err(NebulaError::InvalidOperation {
                 message: format!("Cannot compare {} and {}", lhs.type_name(), rhs.type_name()),
             }.into()),
         }
@@ -904,31 +904,31 @@ impl Interpreter {
     fn bitand(&self, lhs: &Value, rhs: &Value) -> EvalResult {
         match (lhs, rhs) {
             (Value::Integer(a), Value::Integer(b)) => Ok(Value::Integer(a & b)),
-            _ => Err(SpectreError::InvalidOperation { message: "Bitwise AND requires integers".to_string() }.into()),
+            _ => Err(NebulaError::InvalidOperation { message: "Bitwise AND requires integers".to_string() }.into()),
         }
     }
     fn bitor(&self, lhs: &Value, rhs: &Value) -> EvalResult {
         match (lhs, rhs) {
             (Value::Integer(a), Value::Integer(b)) => Ok(Value::Integer(a | b)),
-            _ => Err(SpectreError::InvalidOperation { message: "Bitwise OR requires integers".to_string() }.into()),
+            _ => Err(NebulaError::InvalidOperation { message: "Bitwise OR requires integers".to_string() }.into()),
         }
     }
     fn bitxor(&self, lhs: &Value, rhs: &Value) -> EvalResult {
         match (lhs, rhs) {
             (Value::Integer(a), Value::Integer(b)) => Ok(Value::Integer(a ^ b)),
-            _ => Err(SpectreError::InvalidOperation { message: "Bitwise XOR requires integers".to_string() }.into()),
+            _ => Err(NebulaError::InvalidOperation { message: "Bitwise XOR requires integers".to_string() }.into()),
         }
     }
     fn shl(&self, lhs: &Value, rhs: &Value) -> EvalResult {
         match (lhs, rhs) {
             (Value::Integer(a), Value::Integer(b)) => Ok(Value::Integer(a << b)),
-            _ => Err(SpectreError::InvalidOperation { message: "Shift requires integers".to_string() }.into()),
+            _ => Err(NebulaError::InvalidOperation { message: "Shift requires integers".to_string() }.into()),
         }
     }
     fn shr(&self, lhs: &Value, rhs: &Value) -> EvalResult {
         match (lhs, rhs) {
             (Value::Integer(a), Value::Integer(b)) => Ok(Value::Integer(a >> b)),
-            _ => Err(SpectreError::InvalidOperation { message: "Shift requires integers".to_string() }.into()),
+            _ => Err(NebulaError::InvalidOperation { message: "Shift requires integers".to_string() }.into()),
         }
     }
     fn eval_unary_op(&self, op: UnaryOp, val: &Value) -> EvalResult {
@@ -937,7 +937,7 @@ impl Interpreter {
                 match val {
                     Value::Number(n) => Ok(Value::Number(-n)),
                     Value::Integer(n) => Ok(Value::Integer(-n)),
-                    _ => Err(SpectreError::InvalidOperation {
+                    _ => Err(NebulaError::InvalidOperation {
                         message: format!("Cannot negate {}", val.type_name()),
                     }.into()),
                 }
@@ -946,7 +946,7 @@ impl Interpreter {
             UnaryOp::BitNot => {
                 match val {
                     Value::Integer(n) => Ok(Value::Integer(!n)),
-                    _ => Err(SpectreError::InvalidOperation {
+                    _ => Err(NebulaError::InvalidOperation {
                         message: format!("Cannot bitwise NOT {}", val.type_name()),
                     }.into()),
                 }
@@ -957,7 +957,7 @@ impl Interpreter {
         self.recursion_depth += 1;
         if self.recursion_depth > MAX_RECURSION_DEPTH {
             self.recursion_depth -= 1;
-            return Err(SpectreError::Runtime {
+            return Err(NebulaError::Runtime {
                 message: format!("Maximum recursion depth ({}) exceeded", MAX_RECURSION_DEPTH),
             }.into());
         }
@@ -1004,7 +1004,7 @@ impl Interpreter {
         self.recursion_depth += 1;
         if self.recursion_depth > MAX_RECURSION_DEPTH {
             self.recursion_depth -= 1;
-            return Err(SpectreError::Runtime {
+            return Err(NebulaError::Runtime {
                 message: format!("Maximum recursion depth ({}) exceeded", MAX_RECURSION_DEPTH),
             }.into());
         }
@@ -1050,7 +1050,7 @@ impl Interpreter {
             (Value::Map(m), "values") => {
                 Ok(Value::List(m.values().cloned().collect()))
             }
-            _ => Err(SpectreError::Runtime {
+            _ => Err(NebulaError::Runtime {
                 message: format!("No method '{}' on {}", method, receiver.type_name()),
             }.into()),
         }
@@ -1058,35 +1058,35 @@ impl Interpreter {
     fn get_field(&self, obj: &Value, field: &str) -> EvalResult {
         match obj {
             Value::Map(m) => {
-                m.get(field).cloned().ok_or_else(|| SpectreError::Runtime {
+                m.get(field).cloned().ok_or_else(|| NebulaError::Runtime {
                     message: format!("Key '{}' not found", field),
                 }.into())
             }
             Value::Struct { name, fields } => {
                 if let Some(field_names) = self.structs.get(name) {
                     if let Some(idx) = field_names.iter().position(|n| n == field) {
-                        return fields.get(idx).cloned().ok_or_else(|| SpectreError::Runtime {
+                        return fields.get(idx).cloned().ok_or_else(|| NebulaError::Runtime {
                             message: format!("Field '{}' not found", field),
                         }.into());
                     }
                 }
-                Err(SpectreError::Runtime {
+                Err(NebulaError::Runtime {
                     message: format!("Field '{}' not found on {}", field, name),
                 }.into())
             }
             Value::Tuple(elements) => {
                 if let Ok(idx) = field.parse::<usize>() {
-                    elements.get(idx).cloned().ok_or_else(|| SpectreError::IndexOutOfBounds {
+                    elements.get(idx).cloned().ok_or_else(|| NebulaError::IndexOutOfBounds {
                         index: idx as i64,
                         length: elements.len(),
                     }.into())
                 } else {
-                    Err(SpectreError::Runtime {
+                    Err(NebulaError::Runtime {
                         message: format!("Invalid tuple index: {}", field),
                     }.into())
                 }
             }
-            _ => Err(SpectreError::Runtime {
+            _ => Err(NebulaError::Runtime {
                 message: format!("Cannot access field on {}", obj.type_name()),
             }.into()),
         }
@@ -1094,33 +1094,33 @@ impl Interpreter {
     fn get_index(&self, arr: &Value, idx: &Value) -> EvalResult {
         match (arr, idx) {
             (Value::List(list), idx) => {
-                let i = idx.as_integer().ok_or(EvalError::Error(SpectreError::InvalidOperation {
+                let i = idx.as_integer().ok_or(EvalError::Error(NebulaError::InvalidOperation {
                     message: "Index must be integer".to_string(),
                 }))?;
                 if i < 0 || i as usize >= list.len() {
-                    Err(SpectreError::IndexOutOfBounds { index: i, length: list.len() }.into())
+                    Err(NebulaError::IndexOutOfBounds { index: i, length: list.len() }.into())
                 } else {
                     Ok(list[i as usize].clone())
                 }
             }
             (Value::String(s), idx) => {
-                let i = idx.as_integer().ok_or(EvalError::Error(SpectreError::InvalidOperation {
+                let i = idx.as_integer().ok_or(EvalError::Error(NebulaError::InvalidOperation {
                     message: "Index must be integer".to_string(),
                 }))?;
                 let chars: Vec<_> = s.chars().collect();
                 if i < 0 || i as usize >= chars.len() {
-                    Err(SpectreError::IndexOutOfBounds { index: i, length: chars.len() }.into())
+                    Err(NebulaError::IndexOutOfBounds { index: i, length: chars.len() }.into())
                 } else {
                     Ok(Value::Char(chars[i as usize]))
                 }
             }
             (Value::Map(m), idx) => {
                 let key = idx.to_display_string();
-                m.get(&key).cloned().ok_or_else(|| SpectreError::Runtime {
+                m.get(&key).cloned().ok_or_else(|| NebulaError::Runtime {
                     message: format!("Key '{}' not found", key),
                 }.into())
             }
-            _ => Err(SpectreError::InvalidOperation {
+            _ => Err(NebulaError::InvalidOperation {
                 message: format!("Cannot index {} with {}", arr.type_name(), idx.type_name()),
             }.into()),
         }
@@ -1128,13 +1128,13 @@ impl Interpreter {
     fn cast_value(&self, ty: &Type, val: Value) -> EvalResult {
         match ty {
             Type::Nb => {
-                let n = val.as_number().ok_or(EvalError::Error(SpectreError::InvalidOperation {
+                let n = val.as_number().ok_or(EvalError::Error(NebulaError::InvalidOperation {
                     message: "Cannot convert to number".to_string(),
                 }))?;
                 Ok(Value::Number(n))
             }
             Type::Int => {
-                let n = val.as_integer().ok_or(EvalError::Error(SpectreError::InvalidOperation {
+                let n = val.as_integer().ok_or(EvalError::Error(NebulaError::InvalidOperation {
                     message: "Cannot convert to integer".to_string(),
                 }))?;
                 Ok(Value::Integer(n))

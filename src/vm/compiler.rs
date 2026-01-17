@@ -1,6 +1,6 @@
 use crate::parser::ast::*;
 use crate::interp::Value;
-use crate::error::SpectreResult;
+use crate::error::NebulaResult;
 use super::{Chunk, OpCode};
 struct CompilerScope {
     locals: Vec<String>,
@@ -69,7 +69,7 @@ impl Compiler {
             functions: Vec::new(),
         }
     }
-    pub fn compile(&mut self, program: &Program) -> SpectreResult<Chunk> {
+    pub fn compile(&mut self, program: &Program) -> NebulaResult<Chunk> {
         for item in &program.items {
             self.compile_item(item)?;
         }
@@ -83,14 +83,14 @@ impl Compiler {
     pub fn functions(&self) -> &[super::CompiledFunction] {
         &self.functions
     }
-    fn compile_item(&mut self, item: &Item) -> SpectreResult<()> {
+    fn compile_item(&mut self, item: &Item) -> NebulaResult<()> {
         match item {
             Item::Statement(stmt) => self.compile_stmt(stmt),
             Item::Function(f) => self.compile_function_def(f),
             _ => Ok(()), 
         }
     }
-    fn compile_function_def(&mut self, f: &Function) -> SpectreResult<()> {
+    fn compile_function_def(&mut self, f: &Function) -> NebulaResult<()> {
         let mut func_compiler = Compiler::new();
         for param in &f.params {
             func_compiler.scope.add_local(param.name.clone());
@@ -123,7 +123,7 @@ impl Compiler {
         self.chunk.write_byte(global_idx, 0);
         Ok(())
     }
-    fn compile_stmt(&mut self, stmt: &Stmt) -> SpectreResult<()> {
+    fn compile_stmt(&mut self, stmt: &Stmt) -> NebulaResult<()> {
         let line = 0; 
         match stmt {
             Stmt::Var { name, value, .. } => {
@@ -298,7 +298,7 @@ impl Compiler {
             }
         }
     }
-    fn compile_block(&mut self, stmts: &[Stmt]) -> SpectreResult<()> {
+    fn compile_block(&mut self, stmts: &[Stmt]) -> NebulaResult<()> {
         self.scope.begin_scope();
         for stmt in stmts {
             self.compile_stmt(stmt)?;
@@ -309,7 +309,7 @@ impl Compiler {
         }
         Ok(())
     }
-    fn compile_expr(&mut self, expr: &Expr) -> SpectreResult<()> {
+    fn compile_expr(&mut self, expr: &Expr) -> NebulaResult<()> {
         let line = 0; 
         match expr {
             Expr::Literal(lit) => {
@@ -458,7 +458,7 @@ impl Compiler {
         }
         self.add_global(name.to_string())
     }
-    fn try_fold_binary(&self, left: &Expr, op: &BinaryOp, right: &Expr) -> SpectreResult<Option<Value>> {
+    fn try_fold_binary(&self, left: &Expr, op: &BinaryOp, right: &Expr) -> NebulaResult<Option<Value>> {
         let lval = match self.extract_number(left) {
             Some(v) => v,
             None => return Ok(None),
@@ -473,7 +473,7 @@ impl Compiler {
             BinaryOp::Mul => lval * rval,
             BinaryOp::Div => {
                 if rval == 0.0 {
-                    return Err(crate::error::SpectreError::coded(
+                    return Err(crate::error::NebulaError::coded(
                         crate::error::ErrorCode::E040,
                         "division by zero in constant expression"
                     ));
@@ -482,7 +482,7 @@ impl Compiler {
             }
             BinaryOp::Mod => {
                 if rval == 0.0 {
-                    return Err(crate::error::SpectreError::coded(
+                    return Err(crate::error::NebulaError::coded(
                         crate::error::ErrorCode::E040,
                         "modulo by zero in constant expression"
                     ));

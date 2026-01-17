@@ -1,0 +1,99 @@
+{
+    "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+    "name": "Nebula",
+    "scopeName": "source.nebula",
+    "patterns": [
+        {
+            "include": "#comments"
+        },
+        {
+            "include": "#strings"
+        },
+        {
+            "include": "#numbers"
+        },
+        {
+            "include": "#keywords"
+        },
+        {
+            "include": "#constants"
+        },
+        {
+            "include": "#storage"
+        },
+        {
+            "include": "#builtins"
+        },
+        {
+            "include": "#operators"
+        },
+        {
+            "include": "#functions"
+        }
+    ],
+    "repository": {
+        "comments": {
+            "name": "comment.line.number-sign.nebula",
+            "match": "#.*$"
+        },
+        "strings": {
+            "name": "string.quoted.double.nebula",
+            "begin": "\"",
+            "end": "\"",
+            "patterns": [
+                {
+                    "name": "constant.character.escape.nebula",
+                    "match": "\\\\."
+                }
+            ]
+        },
+        "numbers": {
+            "name": "constant.numeric.nebula",
+            "match": "\\b\\d+(\\.\\d+)?\\b"
+        },
+        "keywords": {
+            "patterns": [
+                {
+                    "name": "keyword.control.nebula",
+                    "match": "\\b(if|elsif|else|while|for|in|break|continue|match|try|catch|await|async|spawn)\\b"
+                },
+                {
+                    "name": "keyword.operator.word.nebula",
+                    "match": "\\b(and|or|not)\\b"
+                },
+                {
+                    "name": "keyword.other.fn.nebula",
+                    "match": "\\b(function|fn|give|return)\\b"
+                },
+                {
+                    "name": "keyword.control.block.nebula",
+                    "match": "\\b(do|end)\\b"
+                }
+            ]
+        },
+        "constants": {
+            "name": "constant.language.nebula",
+            "match": "\\b(on|off|empty)\\b"
+        },
+        "storage": {
+            "name": "storage.type.nebula",
+            "match": "\\b(perm|struct|enum)\\b"
+        },
+        "builtins": {
+            "name": "support.function.nebula",
+            "match": "\\b(log|ask|len|root|wait|type|str|num|abs|floor|ceil|sin|cos|tan|pow|sqrt|rnd|now|sleep|dbg|typeof|get)\\b"
+        },
+        "operators": {
+            "name": "keyword.operator.nebula",
+            "match": "(\\+|\\-|\\*|\\/|%|\\^|==|!=|<=|>=|<|>|=)"
+        },
+        "functions": {
+            "match": "\\b([a-zA-Z_][a-zA-Z0-9_]*)\\s*(?=\\()",
+            "captures": {
+                "1": {
+                    "name": "entity.name.function.nebula"
+                }
+            }
+        }
+    }
+}

@@ -1,0 +1,131 @@
+{
+    "name": "nebula-lang",
+    "displayName": "Nebula",
+    "description": "Galactic scripting language support. Logic is Electric.",
+    "version": "1.0.0",
+    "publisher": "yourname",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/Sxf0z/Nebula"
+    },
+    "license": "MIT",
+    "engines": {
+        "vscode": "^1.60.0"
+    },
+    "categories": [
+        "Programming Languages"
+    ],
+    "icon": "icon.png",
+    "main": "./out/extension.js",
+    "activationEvents": [
+        "onLanguage:nebula"
+    ],
+    "contributes": {
+        "languages": [
+            {
+                "id": "nebula",
+                "aliases": [
+                    "Nebula"
+                ],
+                "extensions": [
+                    ".na"
+                ],
+                "configuration": "./language-configuration.json"
+            }
+        ],
+        "grammars": [
+            {
+                "language": "nebula",
+                "scopeName": "source.nebula",
+                "path": "./syntaxes/nebula.tmLanguage.json"
+            }
+        ],
+        "commands": [
+            {
+                "command": "nebula.run",
+                "title": "Nebula: Run Script",
+                "icon": "$(play)"
+            }
+        ],
+        "configuration": {
+            "title": "Nebula",
+            "properties": {
+                "nebula.executablePath": {
+                    "type": "string",
+                    "default": "nebula",
+                    "description": "Path to the Nebula executable"
+                }
+            }
+        },
+        "menus": {
+            "editor/title": [
+                {
+                    "when": "resourceLangId == nebula",
+                    "command": "nebula.run",
+                    "group": "navigation"
+                }
+            ]
+        },
+        "themes": [
+            {
+                "label": "Nebula Galaxy",
+                "uiTheme": "vs-dark",
+                "path": "./themes/nebula-galaxy-color-theme.json"
+            }
+        ],
+        "debuggers": [
+            {
+                "type": "nebula",
+                "label": "Nebula",
+                "program": "./out/extension.js",
+                "languages": [
+                    "nebula"
+                ],
+                "configurationAttributes": {
+                    "launch": {
+                        "required": [
+                            "program"
+                        ],
+                        "properties": {
+                            "program": {
+                                "type": "string",
+                                "description": "Path to Nebula script",
+                                "default": "${file}"
+                            }
+                        }
+                    }
+                },
+                "initialConfigurations": [
+                    {
+                        "type": "nebula",
+                        "request": "launch",
+                        "name": "Run Nebula Script",
+                        "program": "${file}"
+                    }
+                ],
+                "configurationSnippets": [
+                    {
+                        "label": "Nebula: Run Script",
+                        "description": "Run the current Nebula file",
+                        "body": {
+                            "type": "nebula",
+                            "request": "launch",
+                            "name": "Run Nebula Script",
+                            "program": "${file}"
+                        }
+                    }
+                ]
+            }
+        ]
+    },
+    "scripts": {
+        "vscode:prepublish": "npm run compile",
+        "compile": "tsc -p ./",
+        "watch": "tsc -watch -p ./"
+    },
+    "devDependencies": {
+        "@types/vscode": "^1.60.0",
+        "@types/node": "^16.0.0",
+        "typescript": "^4.5.0"
+    }
+}

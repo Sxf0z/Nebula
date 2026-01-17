@@ -1,0 +1,23 @@
+# Nebula Hello World
+# This demonstrates the syntax highlighting features
+
+perm GREETING = "Hello, Galaxy!"
+perm STATUS = on
+
+fn display_message(msg) do
+    if STATUS == on do
+        log(msg)
+    else
+        log("Systems offline.")
+    end
+end
+
+# Main execution
+display_message(GREETING)
+
+# Math constants
+perm PI = 3.14159
+perm RADIUS = 10
+perm AREA = PI * RADIUS ^ 2
+
+log("Area:", AREA)

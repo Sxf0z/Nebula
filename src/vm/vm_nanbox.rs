@@ -1,5 +1,5 @@
 use crate::error::{SpectreError, SpectreResult, ErrorCode};
-use super::{Chunk, OpCode, NanBoxed, HeapObject, CompiledFunction, HeapData};
+use super::{Chunk, OpCode, NanBoxed, HeapObject, CompiledFunction};
 const STACK_SIZE: usize = 256;
 const MAX_GLOBALS: usize = 256;
 const MAX_FRAMES: usize = 64;
@@ -11,6 +11,7 @@ pub const BUILTIN_NAMES: [&str; BUILTIN_COUNT] = [
     "rnd", "dbg", "now", "sleep", "str", "num"
 ];
 #[derive(Clone)]
+#[allow(dead_code)]
 struct CallFrame {
     function: Option<*mut HeapObject>,
     ip: usize,

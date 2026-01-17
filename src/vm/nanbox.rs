@@ -1,4 +1,5 @@
 use std::fmt;
+#[cfg(debug_assertions)]
 use std::sync::atomic::{AtomicUsize, Ordering};
 #[cfg(debug_assertions)]
 static ALLOC_COUNT: AtomicUsize = AtomicUsize::new(0);

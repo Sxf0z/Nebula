@@ -5,7 +5,7 @@ use std::process;
 use std::time::Instant;
 
 use colored::Colorize;
-use specterscript::{Lexer, Parser, Interpreter, SpectreError, VM, Compiler, Value};
+use nebula::{Lexer, Parser, Interpreter, SpectreError, VM, Compiler, Value};
 
 const BANNER: &str = r#"
 ▀█▄    ▀█▀         ▀██                ▀██          
@@ -106,7 +106,7 @@ fn run_repl(use_vm: bool) {
                 println!("{} {}", "[ERROR]".bold().red(), e.message().red());
             }
         }
-        
+
         let elapsed = start.elapsed();
         if elapsed.as_millis() > 10 {
             println!("{}", format!("  ⏱ {}ms", elapsed.as_millis()).dimmed());
@@ -124,7 +124,7 @@ fn run_file(path: &str, use_vm: bool) {
     };
 
     let start = Instant::now();
-    
+
     let result = if use_vm {
         run_vm(&source)
     } else {
@@ -150,7 +150,7 @@ fn run_interpreter(source: &str, interpreter: &mut Interpreter) -> Result<Value,
     let tokens: Vec<_> = lexer.collect();
 
     for token in &tokens {
-        if let specterscript::TokenKind::Error(msg) = &token.kind {
+        if let nebula::TokenKind::Error(msg) = &token.kind {
             return Err(SpectreError::Lexer {
                 message: msg.clone(),
                 span: token.span,
@@ -168,7 +168,7 @@ fn run_vm(source: &str) -> Result<Value, SpectreError> {
     let tokens: Vec<_> = lexer.collect();
 
     for token in &tokens {
-        if let specterscript::TokenKind::Error(msg) = &token.kind {
+        if let nebula::TokenKind::Error(msg) = &token.kind {
             return Err(SpectreError::Lexer {
                 message: msg.clone(),
                 span: token.span,
@@ -186,11 +186,11 @@ fn run_vm(source: &str) -> Result<Value, SpectreError> {
 
     let mut vm = VM::new();
     let result = vm.run_with_functions(&chunk, global_names, functions)?;
-    
+
     Ok(nanbox_to_value(result))
 }
 
-fn nanbox_to_value(nb: specterscript::vm::NanBoxed) -> Value {
+fn nanbox_to_value(nb: nebula::vm::NanBoxed) -> Value {
     if nb.is_nil() {
         Value::Nil
     } else if nb.is_bool() {
@@ -202,14 +202,14 @@ fn nanbox_to_value(nb: specterscript::vm::NanBoxed) -> Value {
     } else if nb.is_ptr() {
         let obj = unsafe { &*nb.as_ptr() };
         match &obj.data {
-            specterscript::vm::HeapData::String(s) => Value::String(s.to_string()),
-            specterscript::vm::HeapData::List(items) => {
+            nebula::vm::HeapData::String(s) => Value::String(s.to_string()),
+            nebula::vm::HeapData::List(items) => {
                 Value::List(items.iter().map(|v| nanbox_to_value(*v)).collect())
             }
-            specterscript::vm::HeapData::Map(map) => {
+            nebula::vm::HeapData::Map(map) => {
                 Value::Map(map.iter().map(|(k, v)| (k.to_string(), nanbox_to_value(*v))).collect())
             }
-            specterscript::vm::HeapData::Function(f) => {
+            nebula::vm::HeapData::Function(f) => {
                 Value::String(format!("<fn {}>", f.name))
             }
         }
@@ -221,7 +221,7 @@ fn nanbox_to_value(nb: specterscript::vm::NanBoxed) -> Value {
 fn report_error(source: &str, error: &SpectreError) {
     eprintln!("{}", "[COSMIC FRACTURE]".bold().red());
     eprintln!("{}", error.message().red());
-    
+
     if let Some(span) = error.span() {
         let lines: Vec<_> = source.lines().collect();
         if span.line > 0 && span.line <= lines.len() {

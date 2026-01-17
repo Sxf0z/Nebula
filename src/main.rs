@@ -1,16 +1,22 @@
-//! SpecterScript CLI
-//! v0.9: Single optimized VM, no legacy flags
-
 use std::env;
 use std::fs;
 use std::io::{self, Write};
 use std::process;
+use std::time::Instant;
 
+use colored::Colorize;
 use specterscript::{Lexer, Parser, Interpreter, SpectreError, VM, Compiler, Value};
+
+const BANNER: &str = r#"
+▀█▄    ▀█▀         ▀██                ▀██          
+ █▀█    █    ▄▄▄▄   ██ ▄▄▄  ▄▄▄ ▄▄▄    ██    ▄▄▄▄  
+ █ ▀█▄  █  ▄█▄▄▄██  ██▀  ██  ██  ██    ██   ▀▀ ▄██  
+ █    ███  ██       ██    █  ██  ██    ██   ▄█▀ ██  
+▄█▄    ▀█   ▀█▄▄▄▀  ▀█▄▄▄▀   ▀█▄▄▀█▄  ▄██▄  ▀█▄▄▀█▀  
+"#;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
-    
     let (use_vm, file_path) = parse_args(&args);
 
     match file_path {
@@ -30,7 +36,7 @@ fn parse_args(args: &[String]) -> (bool, Option<String>) {
             print_usage();
             process::exit(0);
         } else if arg.starts_with('-') {
-            eprintln!("Unknown flag: {}", arg);
+            eprintln!("{} Unknown flag: {}", "[ERROR]".bold().red(), arg);
             print_usage();
             process::exit(64);
         } else {
@@ -42,28 +48,30 @@ fn parse_args(args: &[String]) -> (bool, Option<String>) {
 }
 
 fn print_usage() {
-    println!("SpecterScript v1.0.0");
+    println!("{}", BANNER.cyan());
+    println!("{}", "  Logic is Electric.".purple().italic());
     println!();
-    println!("Usage:");
-    println!("  specter                   Start REPL");
-    println!("  specter <script.sp>       Run script (interpreter)");
-    println!("  specter --vm <script>     Run script (fast VM)");
+    println!("{}", "USAGE:".bold().white());
+    println!("  {} {}              {}", "nebula".cyan(), "".dimmed(), "Start REPL");
+    println!("  {} {}  {}", "nebula".cyan(), "<script.na>".green(), "Run script (interpreter)");
+    println!("  {} {} {} {}", "nebula".cyan(), "--vm".yellow(), "<script>".green(), "Run script (fast VM)");
     println!();
-    println!("Options:");
-    println!("  --vm    Use bytecode VM (10x faster)");
-    println!("  --help  Show this message");
+    println!("{}", "OPTIONS:".bold().white());
+    println!("  {}    Use bytecode VM (35x faster)", "--vm".yellow());
+    println!("  {}  Show this message", "--help".yellow());
 }
 
 fn run_repl(use_vm: bool) {
-    let mode_str = if use_vm { "vm" } else { "interpreter" };
-    println!("SpecterScript REPL v1.0.0 ({})", mode_str);
-    println!("Type 'exit' to quit\n");
+    println!("{}", BANNER.cyan());
+    let mode = if use_vm { "VM".green() } else { "Interpreter".blue() };
+    println!("  {} {} {}", "Nebula".purple().bold(), "v1.0".dimmed(), mode);
+    println!("  Type {} to quit\n", "'exit'".dimmed());
 
     let mut interpreter = Interpreter::new();
     let mut input = String::new();
 
     loop {
-        print!(">> ");
+        print!("{} ", "λ".purple().bold());
         let _ = io::stdout().flush();
 
         input.clear();
@@ -73,6 +81,7 @@ fn run_repl(use_vm: bool) {
 
         let line = input.trim();
         if line == "exit" || line == "quit" {
+            println!("{}", "✨ Goodbye.".cyan());
             break;
         }
 
@@ -80,6 +89,7 @@ fn run_repl(use_vm: bool) {
             continue;
         }
 
+        let start = Instant::now();
         let result = if use_vm {
             run_vm(line)
         } else {
@@ -89,10 +99,17 @@ fn run_repl(use_vm: bool) {
         match result {
             Ok(value) => {
                 if !matches!(value, Value::Nil) {
-                    println!("=> {}", value);
+                    println!("{} {}", "=>".dimmed(), format!("{}", value).green());
                 }
             }
-            Err(e) => eprintln!("Error: {}", e.message()),
+            Err(e) => {
+                println!("{} {}", "[ERROR]".bold().red(), e.message().red());
+            }
+        }
+        
+        let elapsed = start.elapsed();
+        if elapsed.as_millis() > 10 {
+            println!("{}", format!("  ⏱ {}ms", elapsed.as_millis()).dimmed());
         }
     }
 }
@@ -101,11 +118,13 @@ fn run_file(path: &str, use_vm: bool) {
     let source = match fs::read_to_string(path) {
         Ok(s) => s,
         Err(e) => {
-            eprintln!("Error reading file '{}': {}", path, e);
+            eprintln!("{} Cannot read '{}': {}", "[FILE ERROR]".bold().red(), path.yellow(), e);
             process::exit(66);
         }
     };
 
+    let start = Instant::now();
+    
     let result = if use_vm {
         run_vm(&source)
     } else {
@@ -113,9 +132,16 @@ fn run_file(path: &str, use_vm: bool) {
         run_interpreter(&source, &mut interpreter)
     };
 
-    if let Err(e) = result {
-        report_error(&source, &e);
-        process::exit(70);
+    let elapsed = start.elapsed();
+
+    match result {
+        Ok(_) => {
+            println!("{}", format!("✨ Executed in {:.3}s", elapsed.as_secs_f64()).cyan());
+        }
+        Err(e) => {
+            report_error(&source, &e);
+            process::exit(70);
+        }
     }
 }
 
@@ -193,16 +219,17 @@ fn nanbox_to_value(nb: specterscript::vm::NanBoxed) -> Value {
 }
 
 fn report_error(source: &str, error: &SpectreError) {
-    eprintln!("Error: {}", error.message());
+    eprintln!("{}", "[COSMIC FRACTURE]".bold().red());
+    eprintln!("{}", error.message().red());
     
     if let Some(span) = error.span() {
         let lines: Vec<_> = source.lines().collect();
         if span.line > 0 && span.line <= lines.len() {
             let line_content = lines[span.line - 1];
-            eprintln!("  --> line {}", span.line);
-            eprintln!("   |");
-            eprintln!("{:3} | {}", span.line, line_content);
-            eprintln!("   | {}^", " ".repeat(span.column.saturating_sub(1)));
+            eprintln!("  {} line {}", "-->".cyan(), span.line);
+            eprintln!("   {}", "|".cyan());
+            eprintln!("{:3} {} {}", span.line, "|".cyan(), line_content);
+            eprintln!("   {} {}^", "|".cyan(), " ".repeat(span.column.saturating_sub(1)));
         }
     }
 }

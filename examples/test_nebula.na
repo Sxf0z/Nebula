@@ -1,0 +1,40 @@
+# Test Nebula syntax
+
+# Variable declarations via assignment
+x = 10
+score = 100
+
+# Constants
+perm MAX_LIVES = 3
+
+# Booleans
+status = on
+active = off
+data = empty
+
+# Function definition
+function double(x) = x * 2
+
+# Block function
+function greet(name) do
+    log("Hello,", name)
+end
+
+# Control flow with elsif
+if status == on do
+    log("Status is on!")
+elsif active == on do
+    log("Active!")
+else
+    log("Neither")
+end
+
+# Main entry point
+function main() do
+    log("Welcome to Nebula!")
+    result = double(5)
+    log("Result:", result)
+    greet("World")
+end
+
+main()

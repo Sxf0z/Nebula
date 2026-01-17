@@ -1,0 +1,13 @@
+# Nebula control flow test
+status = on
+
+if status == on do
+    log("Status is ON!")
+elsif status == off do
+    log("Status is OFF!")
+else
+    log("Unknown")
+end
+
+perm MAX = 100
+log("Max value:", MAX)

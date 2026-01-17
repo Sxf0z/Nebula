@@ -1,0 +1,6 @@
+# Tiny loop
+i = 0
+while i < 100 do
+    i = i + 1
+end
+log("Done", i)

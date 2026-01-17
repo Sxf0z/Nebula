@@ -1,49 +1,32 @@
-//! Runtime values for the interpreter
-//! Based on grammar.md specification
-
 use std::collections::HashMap;
 use std::fmt;
 use std::rc::Rc;
 use std::cell::RefCell;
-
 use crate::parser::ast::Param;
-
-/// Runtime values in SpecterScript
 #[derive(Debug, Clone)]
 pub enum Value {
-    // Primitives
-    Number(f64),        // nb - unified number type
-    Integer(i64),       // int - explicit integer
-    Float(f64),         // fl - explicit float
-    Bool(bool),         // yes/no
-    String(String),     // wrd
-    Byte(u8),           // by
-    Char(char),         // chr
-    Nil,                // nil
-
-    // Collections
-    List(Vec<Value>),                    // lst
-    Map(HashMap<String, Value>),         // map
-    Tuple(Vec<Value>),                   // tup
-    Set(Vec<Value>),                     // set (simplified)
-    Range(i64, i64, bool),               // start, end, inclusive
-
-    // Functions
+    Number(f64),        
+    Integer(i64),       
+    Float(f64),         
+    Bool(bool),         
+    String(String),     
+    Byte(u8),           
+    Char(char),         
+    Nil,                
+    List(Vec<Value>),                    
+    Map(HashMap<String, Value>),         
+    Tuple(Vec<Value>),                   
+    Set(Vec<Value>),                     
+    Range(i64, i64, bool),               
     Function(Rc<FunctionValue>),
     Lambda(Rc<LambdaValue>),
     NativeFunction(NativeFn),
-    
-    // Struct instance
     Struct {
         name: String,
         fields: Vec<Value>,
     },
-    
-    // Channel (simplified)
     Channel(Rc<RefCell<Vec<Value>>>),
 }
-
-/// A user-defined function
 #[derive(Debug, Clone)]
 pub struct FunctionValue {
     pub name: String,
@@ -52,29 +35,23 @@ pub struct FunctionValue {
     pub closure: Rc<RefCell<super::Environment>>,
     pub is_async: bool,
 }
-
-/// A lambda function
 #[derive(Debug, Clone)]
 pub struct LambdaValue {
     pub params: Vec<String>,
     pub body: crate::parser::ast::Expr,
     pub closure: Rc<RefCell<super::Environment>>,
 }
-
-/// Native function type
 #[derive(Clone)]
 pub struct NativeFn {
     pub name: String,
-    pub arity: Option<usize>,  // None = variadic
+    pub arity: Option<usize>,  
     pub func: fn(&[Value]) -> Result<Value, String>,
 }
-
 impl fmt::Debug for NativeFn {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "<native fn {}>", self.name)
     }
 }
-
 impl Value {
     pub fn type_name(&self) -> &'static str {
         match self {
@@ -98,7 +75,6 @@ impl Value {
             Value::Channel(_) => "chan",
         }
     }
-
     pub fn is_truthy(&self) -> bool {
         match self {
             Value::Bool(b) => *b,
@@ -111,7 +87,6 @@ impl Value {
             _ => true,
         }
     }
-
     pub fn as_number(&self) -> Option<f64> {
         match self {
             Value::Number(n) => Some(*n),
@@ -120,7 +95,6 @@ impl Value {
             _ => None,
         }
     }
-
     pub fn as_integer(&self) -> Option<i64> {
         match self {
             Value::Integer(n) => Some(*n),
@@ -129,21 +103,18 @@ impl Value {
             _ => None,
         }
     }
-
     pub fn as_bool(&self) -> Option<bool> {
         match self {
             Value::Bool(b) => Some(*b),
             _ => None,
         }
     }
-
     pub fn as_string(&self) -> Option<&str> {
         match self {
             Value::String(s) => Some(s),
             _ => None,
         }
     }
-
     pub fn to_display_string(&self) -> String {
         match self {
             Value::String(s) => s.clone(),
@@ -151,7 +122,6 @@ impl Value {
         }
     }
 }
-
 impl fmt::Display for Value {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -224,7 +194,6 @@ impl fmt::Display for Value {
         }
     }
 }
-
 impl PartialEq for Value {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
@@ -236,7 +205,6 @@ impl PartialEq for Value {
             (Value::Nil, Value::Nil) => true,
             (Value::List(a), Value::List(b)) => a == b,
             (Value::Tuple(a), Value::Tuple(b)) => a == b,
-            // Cross-type numeric comparison
             (Value::Number(a), Value::Integer(b)) => *a == *b as f64,
             (Value::Integer(a), Value::Number(b)) => *a as f64 == *b,
             _ => false,

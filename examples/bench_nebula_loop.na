@@ -1,0 +1,7 @@
+# Nebula Benchmark: Loop
+log("Starting loop (100k)...")
+i = 0
+while i < 100000 do
+    i = i + 1
+end
+log("Loop finished:", i)

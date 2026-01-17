@@ -1,13 +1,9 @@
-//! Built-in functions and standard library
-
 use crate::interp::{Value, NativeFn};
-
-/// Register all built-in functions
 pub fn get_builtins() -> Vec<(&'static str, NativeFn)> {
     vec![
         ("log", NativeFn {
             name: "log".to_string(),
-            arity: None, // variadic
+            arity: None, 
             func: |args| {
                 let output: Vec<_> = args.iter().map(|a| format!("{}", a)).collect();
                 println!("{}", output.join(" "));

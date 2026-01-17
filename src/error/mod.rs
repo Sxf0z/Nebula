@@ -1,54 +1,29 @@
-//! Error types for SpecterScript
-//! 
-//! Unified error system with memorable, dry error messages.
-
 use thiserror::Error;
 use crate::lexer::Span;
-
 pub type SpectreResult<T> = Result<T, SpectreError>;
-
-/// Error codes for categorization
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ErrorCode {
-    // Parse errors (E001-E009)
-    E001, // unexpected token
-    E002, // expected identifier
-    E003, // unclosed block
-    E004, // invalid expression
-    
-    // Runtime errors (E010-E019)
-    E010, // variable not found
-    E011, // not callable
-    E012, // wrong arg count
-    E013, // nil access
-    
-    // Index errors (E020-E029)
-    E020, // out of bounds
-    E021, // invalid index type
-    
-    // Type errors (E030-E039)
-    E030, // type mismatch
-    E031, // not a number
-    E032, // not iterable
-    
-    // Math errors (E040-E049)
-    E040, // divide by zero
-    
-    // Recursion errors (E050-E059)
-    E050, // stack overflow
-    
-    // IO errors (E060-E069)
-    E060, // file not found
-    E061, // io failed
-    
-    // Limit errors (E070-E079)
-    E070, // execution timeout
-    E071, // iteration limit
-    
-    // Extension errors (E080-E089)
-    E080, // extension error
+    E001, 
+    E002, 
+    E003, 
+    E004, 
+    E010, 
+    E011, 
+    E012, 
+    E013, 
+    E020, 
+    E021, 
+    E030, 
+    E031, 
+    E032, 
+    E040, 
+    E050, 
+    E060, 
+    E061, 
+    E070, 
+    E071, 
+    E080, 
 }
-
 impl ErrorCode {
     pub fn as_str(&self) -> &'static str {
         match self {
@@ -74,7 +49,6 @@ impl ErrorCode {
             ErrorCode::E080 => "E080",
         }
     }
-    
     pub fn message(&self) -> &'static str {
         match self {
             ErrorCode::E001 => "unexpected token",
@@ -100,7 +74,6 @@ impl ErrorCode {
         }
     }
 }
-
 #[derive(Error, Debug, Clone)]
 pub enum SpectreError {
     #[error("[{code}] {msg}")]
@@ -109,38 +82,26 @@ pub enum SpectreError {
         msg: String,
         span: Option<Span>,
     },
-    
-    // Legacy variants for backward compatibility
     #[error("Lexer error at {span}: {message}")]
     Lexer { message: String, span: Span },
-
     #[error("Parse error at {span}: {message}")]
     Parse { message: String, span: Span },
-
     #[error("Type error at {span}: {message}")]
     Type { message: String, span: Span },
-
     #[error("Runtime error: {message}")]
     Runtime { message: String },
-
     #[error("Undefined variable: {name}")]
     UndefinedVariable { name: String },
-
     #[error("Index out of bounds: {index} (length: {length})")]
     IndexOutOfBounds { index: i64, length: usize },
-
     #[error("Division by zero")]
     DivisionByZero,
-
     #[error("Invalid operation: {message}")]
     InvalidOperation { message: String },
-
     #[error("IO error: {message}")]
     Io { message: String },
 }
-
 impl SpectreError {
-    // New constructor for coded errors
     pub fn coded(code: ErrorCode, detail: impl Into<String>) -> Self {
         let detail = detail.into();
         let msg = if detail.is_empty() {
@@ -150,7 +111,6 @@ impl SpectreError {
         };
         SpectreError::Coded { code, msg, span: None }
     }
-    
     pub fn coded_at(code: ErrorCode, detail: impl Into<String>, span: Span) -> Self {
         let detail = detail.into();
         let msg = if detail.is_empty() {
@@ -160,7 +120,6 @@ impl SpectreError {
         };
         SpectreError::Coded { code, msg, span: Some(span) }
     }
-    
     pub fn span(&self) -> Option<&Span> {
         match self {
             SpectreError::Coded { span, .. } => span.as_ref(),
@@ -170,7 +129,6 @@ impl SpectreError {
             _ => None,
         }
     }
-
     pub fn message(&self) -> String {
         match self {
             SpectreError::Coded { msg, .. } => msg.clone(),
@@ -186,7 +144,6 @@ impl SpectreError {
             SpectreError::Io { message } => message.clone(),
         }
     }
-    
     pub fn code(&self) -> Option<ErrorCode> {
         match self {
             SpectreError::Coded { code, .. } => Some(*code),
@@ -197,14 +154,11 @@ impl SpectreError {
         }
     }
 }
-
 impl std::fmt::Display for ErrorCode {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.as_str())
     }
 }
-
-/// Special control flow - not really an error
 #[derive(Debug, Clone)]
 pub enum ControlFlow<V> {
     Return(V),

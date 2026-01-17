@@ -1,44 +1,27 @@
-//! Expression and statement evaluation
-//! Based on grammar.md specification
-
 use std::collections::HashMap;
 use std::rc::Rc;
 use std::cell::RefCell;
-
 use crate::error::{SpectreError, SpectreResult, ErrorCode};
 use crate::parser::ast::*;
 use super::value::{Value, FunctionValue, LambdaValue, NativeFn};
 use super::env::Environment;
-
-/// Control flow signals (not errors)
 enum ControlFlow {
     Return(Value),
     Break,
     Continue,
 }
-
 type EvalResult = Result<Value, EvalError>;
-
-/// Evaluation error or control flow
 enum EvalError {
     Error(SpectreError),
     Control(ControlFlow),
 }
-
 impl From<SpectreError> for EvalError {
     fn from(e: SpectreError) -> Self {
         EvalError::Error(e)
     }
 }
-
-/// Maximum recursion depth to prevent stack overflow
-/// Set conservatively low for Windows default 1MB stack in debug mode
 const MAX_RECURSION_DEPTH: usize = 50;
-
-/// Maximum loop iterations to prevent infinite loops
 const MAX_ITERATIONS: usize = 1_000_000;
-
-/// The interpreter
 pub struct Interpreter {
     global: Rc<RefCell<Environment>>,
     current: Rc<RefCell<Environment>>,
@@ -46,27 +29,20 @@ pub struct Interpreter {
     recursion_depth: usize,
     iteration_count: usize,
 }
-
 impl Interpreter {
     pub fn new() -> Self {
         let global = Rc::new(RefCell::new(Environment::new()));
-        
-        // Register built-in functions
         {
             let mut env = global.borrow_mut();
-            
-            // log(...) - print with multiple args
             env.define("log".to_string(), Value::NativeFunction(NativeFn {
                 name: "log".to_string(),
-                arity: None, // variadic
+                arity: None, 
                 func: |args| {
                     let output: Vec<_> = args.iter().map(|a| a.to_display_string()).collect();
                     println!("{}", output.join(" "));
                     Ok(Value::Nil)
                 },
             }));
-
-            // get() - read user input
             env.define("get".to_string(), Value::NativeFunction(NativeFn {
                 name: "get".to_string(),
                 arity: Some(0),
@@ -76,8 +52,6 @@ impl Interpreter {
                     Ok(Value::String(line.trim().to_string()))
                 },
             }));
-
-            // typeof(value)
             env.define("typeof".to_string(), Value::NativeFunction(NativeFn {
                 name: "typeof".to_string(),
                 arity: Some(1),
@@ -85,8 +59,6 @@ impl Interpreter {
                     Ok(Value::String(args[0].type_name().to_string()))
                 },
             }));
-
-            // Math functions
             env.define("sqrt".to_string(), Value::NativeFunction(NativeFn {
                 name: "sqrt".to_string(),
                 arity: Some(1),
@@ -95,7 +67,6 @@ impl Interpreter {
                     Ok(Value::Number(n.sqrt()))
                 },
             }));
-
             env.define("abs".to_string(), Value::NativeFunction(NativeFn {
                 name: "abs".to_string(),
                 arity: Some(1),
@@ -108,7 +79,6 @@ impl Interpreter {
                     }
                 },
             }));
-
             env.define("sin".to_string(), Value::NativeFunction(NativeFn {
                 name: "sin".to_string(),
                 arity: Some(1),
@@ -117,7 +87,6 @@ impl Interpreter {
                     Ok(Value::Number(n.sin()))
                 },
             }));
-
             env.define("cos".to_string(), Value::NativeFunction(NativeFn {
                 name: "cos".to_string(),
                 arity: Some(1),
@@ -126,7 +95,6 @@ impl Interpreter {
                     Ok(Value::Number(n.cos()))
                 },
             }));
-
             env.define("tan".to_string(), Value::NativeFunction(NativeFn {
                 name: "tan".to_string(),
                 arity: Some(1),
@@ -135,7 +103,6 @@ impl Interpreter {
                     Ok(Value::Number(n.tan()))
                 },
             }));
-
             env.define("floor".to_string(), Value::NativeFunction(NativeFn {
                 name: "floor".to_string(),
                 arity: Some(1),
@@ -144,7 +111,6 @@ impl Interpreter {
                     Ok(Value::Number(n.floor()))
                 },
             }));
-
             env.define("ceil".to_string(), Value::NativeFunction(NativeFn {
                 name: "ceil".to_string(),
                 arity: Some(1),
@@ -153,7 +119,6 @@ impl Interpreter {
                     Ok(Value::Number(n.ceil()))
                 },
             }));
-
             env.define("round".to_string(), Value::NativeFunction(NativeFn {
                 name: "round".to_string(),
                 arity: Some(1),
@@ -162,7 +127,6 @@ impl Interpreter {
                     Ok(Value::Number(n.round()))
                 },
             }));
-
             env.define("pow".to_string(), Value::NativeFunction(NativeFn {
                 name: "pow".to_string(),
                 arity: Some(2),
@@ -172,7 +136,6 @@ impl Interpreter {
                     Ok(Value::Number(base.powf(exp)))
                 },
             }));
-
             env.define("exp".to_string(), Value::NativeFunction(NativeFn {
                 name: "exp".to_string(),
                 arity: Some(1),
@@ -181,7 +144,6 @@ impl Interpreter {
                     Ok(Value::Number(n.exp()))
                 },
             }));
-
             env.define("ln".to_string(), Value::NativeFunction(NativeFn {
                 name: "ln".to_string(),
                 arity: Some(1),
@@ -190,8 +152,6 @@ impl Interpreter {
                     Ok(Value::Number(n.ln()))
                 },
             }));
-
-            // len() - get length of collection or string
             env.define("len".to_string(), Value::NativeFunction(NativeFn {
                 name: "len".to_string(),
                 arity: Some(1),
@@ -205,8 +165,6 @@ impl Interpreter {
                     }
                 },
             }));
-
-            // Random
             env.define("rnd".to_string(), Value::NativeFunction(NativeFn {
                 name: "rnd".to_string(),
                 arity: Some(0),
@@ -219,8 +177,6 @@ impl Interpreter {
                     Ok(Value::Number((seed / 1_000_000_000.0) % 1.0))
                 },
             }));
-
-            // Debug print
             env.define("dbg".to_string(), Value::NativeFunction(NativeFn {
                 name: "dbg".to_string(),
                 arity: None,
@@ -231,8 +187,6 @@ impl Interpreter {
                     Ok(Value::Nil)
                 },
             }));
-
-            // Channel
             env.define("chan".to_string(), Value::NativeFunction(NativeFn {
                 name: "chan".to_string(),
                 arity: Some(0),
@@ -240,8 +194,6 @@ impl Interpreter {
                     Ok(Value::Channel(Rc::new(RefCell::new(Vec::new()))))
                 },
             }));
-
-            // Time functions
             env.define("now".to_string(), Value::NativeFunction(NativeFn {
                 name: "now".to_string(),
                 arity: Some(0),
@@ -254,7 +206,6 @@ impl Interpreter {
                     Ok(Value::Number(ms))
                 },
             }));
-
             env.define("sleep".to_string(), Value::NativeFunction(NativeFn {
                 name: "sleep".to_string(),
                 arity: Some(1),
@@ -266,8 +217,6 @@ impl Interpreter {
                     Ok(Value::Nil)
                 },
             }));
-
-            // String conversion
             env.define("str".to_string(), Value::NativeFunction(NativeFn {
                 name: "str".to_string(),
                 arity: Some(1),
@@ -275,8 +224,6 @@ impl Interpreter {
                     Ok(Value::String(args[0].to_display_string()))
                 },
             }));
-
-            // Number conversion
             env.define("num".to_string(), Value::NativeFunction(NativeFn {
                 name: "num".to_string(),
                 arity: Some(1),
@@ -296,9 +243,7 @@ impl Interpreter {
                 },
             }));
         }
-
         let current = Rc::clone(&global);
-        
         Self {
             global,
             current,
@@ -307,16 +252,11 @@ impl Interpreter {
             iteration_count: 0,
         }
     }
-
-    /// Reset the current scope back to global (useful for REPL error recovery)
     pub fn reset_scope(&mut self) {
         self.current = Rc::clone(&self.global);
     }
-
     pub fn interpret(&mut self, program: &Program) -> SpectreResult<Value> {
         let mut result = Value::Nil;
-
-        // First pass: collect definitions
         for item in &program.items {
             match item {
                 Item::Struct(s) => {
@@ -329,21 +269,17 @@ impl Interpreter {
                 _ => {}
             }
         }
-
-        // Second pass: execute statements
         for item in &program.items {
             if let Item::Statement(stmt) = item {
                 match self.eval_stmt(stmt) {
                     Ok(v) => result = v,
                     Err(EvalError::Error(e)) => return Err(e),
-                    Err(EvalError::Control(_)) => {} // Ignore control flow at top level
+                    Err(EvalError::Control(_)) => {} 
                 }
             }
         }
-
         Ok(result)
     }
-
     fn define_function(&mut self, f: &Function) {
         let func = FunctionValue {
             name: f.name.clone(),
@@ -354,7 +290,6 @@ impl Interpreter {
         };
         self.current.borrow_mut().define(f.name.clone(), Value::Function(Rc::new(func)));
     }
-
     fn eval_stmt(&mut self, stmt: &Stmt) -> EvalResult {
         match stmt {
             Stmt::Var { name, value, .. } => {
@@ -362,19 +297,16 @@ impl Interpreter {
                 self.current.borrow_mut().define(name.clone(), val);
                 Ok(Value::Nil)
             }
-
             Stmt::Const { name, value, .. } => {
                 let val = self.eval_expr(value)?;
                 self.current.borrow_mut().define(name.clone(), val);
                 Ok(Value::Nil)
             }
-
             Stmt::Assignment { target, value } => {
                 let val = self.eval_expr(value)?;
                 self.assign_target(target, val)?;
                 Ok(Value::Nil)
             }
-
             Stmt::CompoundAssignment { target, op, value } => {
                 let current_val = self.eval_expr(target)?;
                 let rhs = self.eval_expr(value)?;
@@ -387,10 +319,8 @@ impl Interpreter {
                 self.assign_target(target, new_val)?;
                 Ok(Value::Nil)
             }
-
             Stmt::If { condition, then_block, elif_branches, else_block } => {
                 let cond = self.eval_expr(condition)?;
-                
                 if cond.is_truthy() {
                     self.eval_block(then_block)
                 } else {
@@ -400,7 +330,6 @@ impl Interpreter {
                             return self.eval_block(elif_body);
                         }
                     }
-                    
                     if let Some(else_body) = else_block {
                         self.eval_block(else_body)
                     } else {
@@ -408,20 +337,16 @@ impl Interpreter {
                     }
                 }
             }
-
             Stmt::While { condition, body } => {
                 loop {
-                    // Check iteration limit
                     self.iteration_count += 1;
                     if self.iteration_count > MAX_ITERATIONS {
                         return Err(SpectreError::coded(ErrorCode::E071, "while loop").into());
                     }
-                    
                     let cond = self.eval_expr(condition)?;
                     if !cond.is_truthy() {
                         break;
                     }
-                    
                     match self.eval_block(body) {
                         Ok(_) => {}
                         Err(EvalError::Control(ControlFlow::Break)) => break,
@@ -431,7 +356,6 @@ impl Interpreter {
                 }
                 Ok(Value::Nil)
             }
-
             Stmt::For { var, start, end, step, body } => {
                 let start_val = self.eval_expr(start)?.as_integer()
                     .ok_or(EvalError::Error(SpectreError::Runtime { message: "for loop start must be integer".to_string() }))?;
@@ -443,18 +367,14 @@ impl Interpreter {
                 } else {
                     1
                 };
-
                 let mut i = start_val;
                 while (step_val > 0 && i <= end_val) || (step_val < 0 && i >= end_val) {
-                    // Check iteration limit
                     self.iteration_count += 1;
                     if self.iteration_count > MAX_ITERATIONS {
                         return Err(SpectreError::coded(ErrorCode::E071, "for loop").into());
                     }
-                    
                     self.push_scope();
                     self.current.borrow_mut().define(var.clone(), Value::Integer(i));
-                    
                     match self.eval_block_inner(body) {
                         Ok(_) => {}
                         Err(EvalError::Control(ControlFlow::Break)) => {
@@ -471,16 +391,13 @@ impl Interpreter {
                             return Err(e);
                         }
                     }
-                    
                     self.pop_scope();
                     i += step_val;
                 }
                 Ok(Value::Nil)
             }
-
             Stmt::Each { var, iterator, body } => {
                 let iter_val = self.eval_expr(iterator)?;
-                
                 let items: Vec<Value> = match iter_val {
                     Value::Range(start, end, inclusive) => {
                         let end = if inclusive { end + 1 } else { end };
@@ -499,11 +416,9 @@ impl Interpreter {
                         }.into());
                     }
                 };
-
                 for item in items {
                     self.push_scope();
                     self.current.borrow_mut().define(var.clone(), item);
-                    
                     match self.eval_block_inner(body) {
                         Ok(_) => {}
                         Err(EvalError::Control(ControlFlow::Break)) => {
@@ -519,29 +434,23 @@ impl Interpreter {
                             return Err(e);
                         }
                     }
-                    
                     self.pop_scope();
                 }
                 Ok(Value::Nil)
             }
-
             Stmt::Match { value, arms } => {
                 let val = self.eval_expr(value)?;
-                
                 for arm in arms {
                     if self.match_pattern(&arm.pattern, &val) {
                         return self.eval_expr(&arm.body);
                     }
                 }
-                
                 Err(SpectreError::Runtime {
                     message: "Non-exhaustive match".to_string(),
                 }.into())
             }
-
             Stmt::Try { try_block, catch_var, catch_block, finally_block } => {
                 let result = self.eval_block(try_block);
-                
                 let final_result = match result {
                     Err(EvalError::Error(e)) if catch_block.is_some() => {
                         self.push_scope();
@@ -555,14 +464,11 @@ impl Interpreter {
                     }
                     other => other,
                 };
-
                 if let Some(finally) = finally_block {
                     let _ = self.eval_block(finally);
                 }
-
                 final_result
             }
-
             Stmt::Return(expr) => {
                 let value = if let Some(e) = expr {
                     self.eval_expr(e)?
@@ -571,14 +477,11 @@ impl Interpreter {
                 };
                 Err(EvalError::Control(ControlFlow::Return(value)))
             }
-
             Stmt::Break => Err(EvalError::Control(ControlFlow::Break)),
             Stmt::Continue => Err(EvalError::Control(ControlFlow::Continue)),
-
             Stmt::Expression(expr) => self.eval_expr(expr),
         }
     }
-
     fn match_pattern(&self, pattern: &Pattern, value: &Value) -> bool {
         match pattern {
             Pattern::Wildcard => true,
@@ -596,7 +499,6 @@ impl Interpreter {
             }
         }
     }
-
     fn assign_target(&mut self, target: &Expr, value: Value) -> EvalResult {
         match target {
             Expr::Variable(name) => {
@@ -609,7 +511,6 @@ impl Interpreter {
                 if let Expr::Variable(arr_name) = array.as_ref() {
                     let idx = self.eval_expr(index)?.as_integer()
                         .ok_or(EvalError::Error(SpectreError::InvalidOperation { message: "Index must be integer".to_string() }))?;
-                    
                     if let Some(Value::List(mut arr)) = self.current.borrow().get(arr_name) {
                         if idx >= 0 && (idx as usize) < arr.len() {
                             arr[idx as usize] = value;
@@ -637,14 +538,12 @@ impl Interpreter {
             }
         }
     }
-
     fn eval_block(&mut self, stmts: &[Stmt]) -> EvalResult {
         self.push_scope();
         let result = self.eval_block_inner(stmts);
         self.pop_scope();
         result
     }
-
     fn eval_block_inner(&mut self, stmts: &[Stmt]) -> EvalResult {
         let mut result = Value::Nil;
         for stmt in stmts {
@@ -652,34 +551,28 @@ impl Interpreter {
         }
         Ok(result)
     }
-
     fn eval_expr(&mut self, expr: &Expr) -> EvalResult {
         match expr {
             Expr::Literal(lit) => Ok(self.eval_literal(lit)),
-
             Expr::Variable(name) => {
                 self.current.borrow().get(name)
                     .ok_or_else(|| SpectreError::UndefinedVariable { name: name.clone() }.into())
             }
-
             Expr::Binary { left, op, right } => {
                 let lhs = self.eval_expr(left)?;
                 let rhs = self.eval_expr(right)?;
                 self.eval_binary_op(*op, &lhs, &rhs)
             }
-
             Expr::Unary { op, operand } => {
                 let val = self.eval_expr(operand)?;
                 self.eval_unary_op(*op, &val)
             }
-
             Expr::Call { callee, args } => {
                 let callee_val = self.eval_expr(callee)?;
                 let arg_vals: Result<Vec<_>, _> = args.iter()
                     .map(|a| self.eval_expr(a))
                     .collect();
                 let arg_vals = arg_vals?;
-
                 match callee_val {
                     Value::Function(func) => self.call_function(&func, &arg_vals),
                     Value::Lambda(lambda) => self.call_lambda(&lambda, &arg_vals),
@@ -698,7 +591,6 @@ impl Interpreter {
                     }.into()),
                 }
             }
-
             Expr::MethodCall { receiver, method, args } => {
                 let recv_val = self.eval_expr(receiver)?;
                 let arg_vals: Result<Vec<_>, _> = args.iter()
@@ -707,25 +599,21 @@ impl Interpreter {
                 let arg_vals = arg_vals?;
                 self.call_method(&recv_val, method, &arg_vals)
             }
-
             Expr::Field { object, field } => {
                 let obj = self.eval_expr(object)?;
                 self.get_field(&obj, field)
             }
-
             Expr::Index { array, index } => {
                 let arr = self.eval_expr(array)?;
                 let idx = self.eval_expr(index)?;
                 self.get_index(&arr, &idx)
             }
-
             Expr::Slice { array, start, end } => {
                 let arr = self.eval_expr(array)?;
                 let start_idx = start.as_ref().map(|e| self.eval_expr(e)).transpose()?
                     .and_then(|v| v.as_integer());
                 let end_idx = end.as_ref().map(|e| self.eval_expr(e)).transpose()?
                     .and_then(|v| v.as_integer());
-                
                 match arr {
                     Value::List(list) => {
                         let s = start_idx.unwrap_or(0).max(0) as usize;
@@ -743,7 +631,6 @@ impl Interpreter {
                     }.into()),
                 }
             }
-
             Expr::Ternary { condition, then_expr, else_expr } => {
                 let cond = self.eval_expr(condition)?;
                 if cond.is_truthy() {
@@ -752,7 +639,6 @@ impl Interpreter {
                     self.eval_expr(else_expr)
                 }
             }
-
             Expr::Lambda { params, body } => {
                 let lambda = LambdaValue {
                     params: params.clone(),
@@ -761,14 +647,12 @@ impl Interpreter {
                 };
                 Ok(Value::Lambda(Rc::new(lambda)))
             }
-
             Expr::List(elements) => {
                 let vals: Result<Vec<_>, _> = elements.iter()
                     .map(|e| self.eval_expr(e))
                     .collect();
                 Ok(Value::List(vals?))
             }
-
             Expr::Map(pairs) => {
                 let mut map = HashMap::new();
                 for (key, value) in pairs {
@@ -781,14 +665,12 @@ impl Interpreter {
                 }
                 Ok(Value::Map(map))
             }
-
             Expr::Tuple(elements) => {
                 let vals: Result<Vec<_>, _> = elements.iter()
                     .map(|e| self.eval_expr(e))
                     .collect();
                 Ok(Value::Tuple(vals?))
             }
-
             Expr::Range { start, end, inclusive } => {
                 let s = self.eval_expr(start)?.as_integer()
                     .ok_or(EvalError::Error(SpectreError::InvalidOperation { message: "Range start must be integer".to_string() }))?;
@@ -796,7 +678,6 @@ impl Interpreter {
                     .ok_or(EvalError::Error(SpectreError::InvalidOperation { message: "Range end must be integer".to_string() }))?;
                 Ok(Value::Range(s, e, *inclusive))
             }
-
             Expr::StructInit { name, args } => {
                 let arg_vals: Result<Vec<_>, _> = args.iter()
                     .map(|e| self.eval_expr(e))
@@ -806,7 +687,6 @@ impl Interpreter {
                     fields: arg_vals?,
                 })
             }
-
             Expr::Length(operand) => {
                 let val = self.eval_expr(operand)?;
                 match val {
@@ -818,7 +698,6 @@ impl Interpreter {
                     }.into()),
                 }
             }
-
             Expr::Append { list, value } => {
                 let mut arr = match self.eval_expr(list)? {
                     Value::List(a) => a,
@@ -830,15 +709,12 @@ impl Interpreter {
                 arr.push(val);
                 Ok(Value::List(arr))
             }
-
             Expr::Await(operand) => self.eval_expr(operand),
             Expr::Spawn(operand) => self.eval_expr(operand),
-
             Expr::Error(msg) => {
                 let message = self.eval_expr(msg)?.to_display_string();
                 Err(SpectreError::Runtime { message }.into())
             }
-
             Expr::Assert { condition, message } => {
                 let cond = self.eval_expr(condition)?;
                 if !cond.is_truthy() {
@@ -851,7 +727,6 @@ impl Interpreter {
                 }
                 Ok(Value::Nil)
             }
-
             Expr::Send { channel, value } => {
                 if let Value::Channel(ch) = self.eval_expr(channel)? {
                     let val = self.eval_expr(value)?;
@@ -861,7 +736,6 @@ impl Interpreter {
                     Err(SpectreError::InvalidOperation { message: "Send requires channel".to_string() }.into())
                 }
             }
-
             Expr::Receive(channel) => {
                 if let Value::Channel(ch) = self.eval_expr(channel)? {
                     ch.borrow_mut().pop().ok_or(SpectreError::Runtime {
@@ -871,25 +745,19 @@ impl Interpreter {
                     Err(SpectreError::InvalidOperation { message: "Receive requires channel".to_string() }.into())
                 }
             }
-
             Expr::Borrow(operand) => self.eval_expr(operand),
-
             Expr::Cast { ty, value } => {
                 let val = self.eval_expr(value)?;
                 self.cast_value(ty, val)
             }
-
             Expr::TypeOf(operand) => {
                 let val = self.eval_expr(operand)?;
                 Ok(Value::String(val.type_name().to_string()))
             }
-
             Expr::Block(stmts) => self.eval_block(stmts),
-
             Expr::Nil => Ok(Value::Nil),
         }
     }
-
     fn eval_literal(&self, lit: &Literal) -> Value {
         match lit {
             Literal::Integer(n) => Value::Number(*n as f64),
@@ -898,7 +766,6 @@ impl Interpreter {
             Literal::Bool(b) => Value::Bool(*b),
         }
     }
-
     fn eval_binary_op(&self, op: BinaryOp, lhs: &Value, rhs: &Value) -> EvalResult {
         match op {
             BinaryOp::Add => self.add(lhs, rhs),
@@ -922,7 +789,6 @@ impl Interpreter {
             BinaryOp::Shr => self.shr(lhs, rhs),
         }
     }
-
     fn add(&self, lhs: &Value, rhs: &Value) -> EvalResult {
         match (lhs, rhs) {
             (Value::Number(a), Value::Number(b)) => Ok(Value::Number(a + b)),
@@ -935,7 +801,6 @@ impl Interpreter {
             }.into()),
         }
     }
-
     fn subtract(&self, lhs: &Value, rhs: &Value) -> EvalResult {
         match (lhs, rhs) {
             (Value::Number(a), Value::Number(b)) => Ok(Value::Number(a - b)),
@@ -947,7 +812,6 @@ impl Interpreter {
             }.into()),
         }
     }
-
     fn multiply(&self, lhs: &Value, rhs: &Value) -> EvalResult {
         match (lhs, rhs) {
             (Value::Number(a), Value::Number(b)) => Ok(Value::Number(a * b)),
@@ -959,7 +823,6 @@ impl Interpreter {
             }.into()),
         }
     }
-
     fn divide(&self, lhs: &Value, rhs: &Value) -> EvalResult {
         match (lhs, rhs) {
             (Value::Number(a), Value::Number(b)) => {
@@ -975,7 +838,6 @@ impl Interpreter {
             }.into()),
         }
     }
-
     fn modulo(&self, lhs: &Value, rhs: &Value) -> EvalResult {
         match (lhs, rhs) {
             (Value::Number(a), Value::Number(b)) => Ok(Value::Number(a % b)),
@@ -983,7 +845,6 @@ impl Interpreter {
                 if *b == 0 { Err(SpectreError::DivisionByZero.into()) }
                 else { Ok(Value::Integer(a % b)) }
             }
-            // Cross-type: convert to float
             (Value::Number(a), Value::Integer(b)) => Ok(Value::Number(a % (*b as f64))),
             (Value::Integer(a), Value::Number(b)) => Ok(Value::Number((*a as f64) % b)),
             _ => Err(SpectreError::InvalidOperation {
@@ -991,7 +852,6 @@ impl Interpreter {
             }.into()),
         }
     }
-
     fn power(&self, lhs: &Value, rhs: &Value) -> EvalResult {
         let base = lhs.as_number().ok_or(EvalError::Error(SpectreError::InvalidOperation {
             message: "Power requires numbers".to_string(),
@@ -1001,7 +861,6 @@ impl Interpreter {
         }))?;
         Ok(Value::Number(base.powf(exp)))
     }
-
     fn compare_lt(&self, lhs: &Value, rhs: &Value) -> EvalResult {
         match (lhs, rhs) {
             (Value::Number(a), Value::Number(b)) => Ok(Value::Bool(a < b)),
@@ -1012,7 +871,6 @@ impl Interpreter {
             }.into()),
         }
     }
-
     fn compare_gt(&self, lhs: &Value, rhs: &Value) -> EvalResult {
         match (lhs, rhs) {
             (Value::Number(a), Value::Number(b)) => Ok(Value::Bool(a > b)),
@@ -1023,7 +881,6 @@ impl Interpreter {
             }.into()),
         }
     }
-
     fn compare_le(&self, lhs: &Value, rhs: &Value) -> EvalResult {
         match (lhs, rhs) {
             (Value::Number(a), Value::Number(b)) => Ok(Value::Bool(a <= b)),
@@ -1034,7 +891,6 @@ impl Interpreter {
             }.into()),
         }
     }
-
     fn compare_ge(&self, lhs: &Value, rhs: &Value) -> EvalResult {
         match (lhs, rhs) {
             (Value::Number(a), Value::Number(b)) => Ok(Value::Bool(a >= b)),
@@ -1045,42 +901,36 @@ impl Interpreter {
             }.into()),
         }
     }
-
     fn bitand(&self, lhs: &Value, rhs: &Value) -> EvalResult {
         match (lhs, rhs) {
             (Value::Integer(a), Value::Integer(b)) => Ok(Value::Integer(a & b)),
             _ => Err(SpectreError::InvalidOperation { message: "Bitwise AND requires integers".to_string() }.into()),
         }
     }
-
     fn bitor(&self, lhs: &Value, rhs: &Value) -> EvalResult {
         match (lhs, rhs) {
             (Value::Integer(a), Value::Integer(b)) => Ok(Value::Integer(a | b)),
             _ => Err(SpectreError::InvalidOperation { message: "Bitwise OR requires integers".to_string() }.into()),
         }
     }
-
     fn bitxor(&self, lhs: &Value, rhs: &Value) -> EvalResult {
         match (lhs, rhs) {
             (Value::Integer(a), Value::Integer(b)) => Ok(Value::Integer(a ^ b)),
             _ => Err(SpectreError::InvalidOperation { message: "Bitwise XOR requires integers".to_string() }.into()),
         }
     }
-
     fn shl(&self, lhs: &Value, rhs: &Value) -> EvalResult {
         match (lhs, rhs) {
             (Value::Integer(a), Value::Integer(b)) => Ok(Value::Integer(a << b)),
             _ => Err(SpectreError::InvalidOperation { message: "Shift requires integers".to_string() }.into()),
         }
     }
-
     fn shr(&self, lhs: &Value, rhs: &Value) -> EvalResult {
         match (lhs, rhs) {
             (Value::Integer(a), Value::Integer(b)) => Ok(Value::Integer(a >> b)),
             _ => Err(SpectreError::InvalidOperation { message: "Shift requires integers".to_string() }.into()),
         }
     }
-
     fn eval_unary_op(&self, op: UnaryOp, val: &Value) -> EvalResult {
         match op {
             UnaryOp::Neg => {
@@ -1103,9 +953,7 @@ impl Interpreter {
             }
         }
     }
-
     fn call_function(&mut self, func: &FunctionValue, args: &[Value]) -> EvalResult {
-        // Check recursion depth to prevent stack overflow
         self.recursion_depth += 1;
         if self.recursion_depth > MAX_RECURSION_DEPTH {
             self.recursion_depth -= 1;
@@ -1113,13 +961,9 @@ impl Interpreter {
                 message: format!("Maximum recursion depth ({}) exceeded", MAX_RECURSION_DEPTH),
             }.into());
         }
-
-        // Create new environment
         let prev = Rc::clone(&self.current);
         let new_env = Environment::with_parent(Rc::clone(&func.closure));
         self.current = Rc::new(RefCell::new(new_env));
-
-        // Bind parameters
         for (i, param) in func.params.iter().enumerate() {
             let value = if i < args.len() {
                 args[i].clone()
@@ -1132,8 +976,6 @@ impl Interpreter {
             };
             self.current.borrow_mut().define(param.name.clone(), value);
         }
-
-        // Execute body
         let result = match &func.body {
             FunctionBody::Expression(expr) => self.eval_expr(expr),
             FunctionBody::Block(stmts) => {
@@ -1154,14 +996,11 @@ impl Interpreter {
                 Ok(res)
             }
         };
-
         self.current = prev;
         self.recursion_depth -= 1;
         result
     }
-
     fn call_lambda(&mut self, lambda: &LambdaValue, args: &[Value]) -> EvalResult {
-        // Check recursion depth
         self.recursion_depth += 1;
         if self.recursion_depth > MAX_RECURSION_DEPTH {
             self.recursion_depth -= 1;
@@ -1169,26 +1008,20 @@ impl Interpreter {
                 message: format!("Maximum recursion depth ({}) exceeded", MAX_RECURSION_DEPTH),
             }.into());
         }
-
         let prev = Rc::clone(&self.current);
         let new_env = Environment::with_parent(Rc::clone(&lambda.closure));
         self.current = Rc::new(RefCell::new(new_env));
-
         for (i, param) in lambda.params.iter().enumerate() {
             let value = args.get(i).cloned().unwrap_or(Value::Nil);
             self.current.borrow_mut().define(param.clone(), value);
         }
-
         let result = self.eval_expr(&lambda.body);
-
         self.current = prev;
         self.recursion_depth -= 1;
         result
     }
-
     fn call_method(&mut self, receiver: &Value, method: &str, args: &[Value]) -> EvalResult {
         match (receiver, method) {
-            // List methods
             (Value::List(arr), "len") => Ok(Value::Integer(arr.len() as i64)),
             (Value::List(arr), "push") if !args.is_empty() => {
                 let mut new_arr = arr.clone();
@@ -1202,8 +1035,6 @@ impl Interpreter {
                 let val = new_arr.pop().unwrap_or(Value::Nil);
                 Ok(val)
             }
-            
-            // String methods
             (Value::String(s), "len") => Ok(Value::Integer(s.len() as i64)),
             (Value::String(s), "upper") => Ok(Value::String(s.to_uppercase())),
             (Value::String(s), "lower") => Ok(Value::String(s.to_lowercase())),
@@ -1213,21 +1044,17 @@ impl Interpreter {
                 let parts: Vec<_> = s.split(&sep).map(|p| Value::String(p.to_string())).collect();
                 Ok(Value::List(parts))
             }
-            
-            // Map methods
             (Value::Map(m), "keys") => {
                 Ok(Value::List(m.keys().map(|k| Value::String(k.clone())).collect()))
             }
             (Value::Map(m), "values") => {
                 Ok(Value::List(m.values().cloned().collect()))
             }
-            
             _ => Err(SpectreError::Runtime {
                 message: format!("No method '{}' on {}", method, receiver.type_name()),
             }.into()),
         }
     }
-
     fn get_field(&self, obj: &Value, field: &str) -> EvalResult {
         match obj {
             Value::Map(m) => {
@@ -1264,7 +1091,6 @@ impl Interpreter {
             }.into()),
         }
     }
-
     fn get_index(&self, arr: &Value, idx: &Value) -> EvalResult {
         match (arr, idx) {
             (Value::List(list), idx) => {
@@ -1299,7 +1125,6 @@ impl Interpreter {
             }.into()),
         }
     }
-
     fn cast_value(&self, ty: &Type, val: Value) -> EvalResult {
         match ty {
             Type::Nb => {
@@ -1320,12 +1145,10 @@ impl Interpreter {
             _ => Ok(val),
         }
     }
-
     fn push_scope(&mut self) {
         let new_env = Environment::with_parent(Rc::clone(&self.current));
         self.current = Rc::new(RefCell::new(new_env));
     }
-
     fn pop_scope(&mut self) {
         let parent = self.current.borrow().parent();
         if let Some(p) = parent {
@@ -1333,7 +1156,6 @@ impl Interpreter {
         }
     }
 }
-
 impl Default for Interpreter {
     fn default() -> Self {
         Self::new()

@@ -1,8 +1,4 @@
-//! I/O built-in functions
-
 use crate::interp::{Value, NativeFn};
-
-/// Standard I/O functions
 pub fn io_builtins() -> Vec<(&'static str, NativeFn)> {
     vec![
         ("input", NativeFn {
@@ -22,7 +18,6 @@ pub fn io_builtins() -> Vec<(&'static str, NativeFn)> {
                 use std::io::{self, Write};
                 print!("{}", args[0]);
                 io::stdout().flush().map_err(|e| e.to_string())?;
-                
                 let mut line = String::new();
                 std::io::stdin().read_line(&mut line)
                     .map_err(|e| e.to_string())?;

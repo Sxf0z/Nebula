@@ -1,0 +1,22 @@
+# Nebula Benchmark
+
+# 1. Loop (900k iterations to be safe under 1M limit)
+log("Starting loop...")
+i = 0
+while i < 500000 do
+    i = i + 1
+end
+log("Loop finished:", i)
+
+# 2. Math / Recursion
+function fib(n) do
+    if n < 2 do
+        give n
+    else
+        give fib(n-1) + fib(n-2)
+    end
+end
+
+log("Starting fib(25)...")
+result = fib(25)
+log("Fib(25):", result)

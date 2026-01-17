@@ -1,0 +1,14 @@
+# Constant Folding Test
+perm SECONDS_IN_DAY = 60 * 60 * 24
+log("Seconds in a day:", SECONDS_IN_DAY)
+
+perm COMPLEX = (10 + 5) * 2 - 8 / 4
+log("Complex expression:", COMPLEX)
+
+perm NEGATIVE = -10 * 3
+log("Negative:", NEGATIVE)
+
+# This should still work dynamically
+x = 5
+y = x + 10
+log("Dynamic:", y)

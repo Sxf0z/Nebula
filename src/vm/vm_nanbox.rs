@@ -1,74 +1,37 @@
-//! NaN-boxed VM - optimized execution with NaN-boxed values
-//!
-//! This VM uses NaN-boxed values for the stack, eliminating boxing overhead
-//! for numeric operations. Falls back to heap allocation for complex types.
-//!
-//! v1.0: User-defined functions with call stack.
-
 use crate::error::{SpectreError, SpectreResult, ErrorCode};
 use super::{Chunk, OpCode, NanBoxed, HeapObject, CompiledFunction, HeapData};
-
-/// Maximum stack size
 const STACK_SIZE: usize = 256;
-
-/// Maximum global slots
 const MAX_GLOBALS: usize = 256;
-
-/// Maximum call frames (recursion limit)
 const MAX_FRAMES: usize = 64;
-
-/// Maximum iterations
 const MAX_ITERATIONS: usize = 1_000_000;
-
-/// Number of reserved builtin slots
 const BUILTIN_COUNT: usize = 21;
-
-/// Builtin function names
 pub const BUILTIN_NAMES: [&str; BUILTIN_COUNT] = [
     "log", "typeof", "sqrt", "abs", "len", "floor", "ceil", 
     "round", "pow", "sin", "cos", "tan", "exp", "ln", "get", 
     "rnd", "dbg", "now", "sleep", "str", "num"
 ];
-
-/// A call frame for function execution
 #[derive(Clone)]
 struct CallFrame {
-    /// Pointer to the function being called (null for top-level)
     function: Option<*mut HeapObject>,
-    /// Instruction pointer within the function's chunk
     ip: usize,
-    /// Base offset in the stack for this frame's locals
     base: usize,
 }
-
-/// NaN-boxed Virtual Machine
 pub struct VMNanBox {
-    /// Value stack (NaN-boxed)
     stack: Vec<NanBoxed>,
-    /// Call frame stack
     frames: Vec<CallFrame>,
-    /// Current instruction pointer (mirrors current frame)
     ip: usize,
-    /// Current frame base (mirrors current frame)
     frame_base: usize,
-    /// Global variables (NaN-boxed)
     globals: Vec<NanBoxed>,
-    /// Global name table (for debugging)
     global_names: Vec<String>,
-    /// Iteration counter
     iteration_count: usize,
 }
-
 impl VMNanBox {
     pub fn new() -> Self {
         let mut globals = vec![NanBoxed::nil(); MAX_GLOBALS];
-        
-        // Register builtins at fixed indices (store as string pointers)
         for (i, name) in BUILTIN_NAMES.iter().enumerate() {
             let ptr = HeapObject::new_string(name);
             globals[i] = NanBoxed::ptr(ptr);
         }
-        
         Self {
             stack: Vec::with_capacity(STACK_SIZE),
             frames: Vec::with_capacity(MAX_FRAMES),
@@ -79,13 +42,9 @@ impl VMNanBox {
             iteration_count: 0,
         }
     }
-    
-    /// Execute bytecode chunk with compiled functions
     pub fn run(&mut self, chunk: &Chunk, global_names: &[String]) -> SpectreResult<NanBoxed> {
         self.run_with_functions(chunk, global_names, &[])
     }
-    
-    /// Execute with user-defined functions
     pub fn run_with_functions(
         &mut self, 
         chunk: &Chunk, 
@@ -98,140 +57,142 @@ impl VMNanBox {
         self.global_names = global_names.to_vec();
         self.frames.clear();
         self.stack.clear();
-        
-        // Push initial frame for top-level code
         self.frames.push(CallFrame {
             function: None,
             ip: 0,
             base: 0,
         });
-        
         self.run_main_loop(chunk, functions)
     }
-    
-    /// Main execution loop - runs on main chunk only
-    /// User functions will be called via call_function
     fn run_main_loop(&mut self, chunk: &Chunk, functions: &[CompiledFunction]) -> SpectreResult<NanBoxed> {
         loop {
             if self.ip >= chunk.code().len() {
                 break;
             }
-            
             let byte = chunk.read_byte(self.ip);
             let op = match OpCode::from_byte(byte) {
                 Some(op) => op,
                 None => return Err(SpectreError::coded(ErrorCode::E004, format!("invalid opcode {}", byte))),
             };
             self.ip += 1;
-            
             match op {
                 OpCode::PushConst => {
                     let idx = chunk.read_byte(self.ip);
                     self.ip += 1;
-                    // Convert from old Value to NanBoxed
                     let value = chunk.get_constant(idx);
                     let nb = self.value_to_nanbox(value);
                     self.push(nb)?;
                 }
-                
                 OpCode::PushNil => self.push(NanBoxed::nil())?,
                 OpCode::PushTrue => self.push(NanBoxed::boolean(true))?,
                 OpCode::PushFalse => self.push(NanBoxed::boolean(false))?,
-                
                 OpCode::Pop => { self.pop()?; }
-                
                 OpCode::Dup => {
                     let value = self.peek(0)?;
                     self.push(value)?;
                 }
-                
                 OpCode::LoadLocal => {
                     let slot = chunk.read_byte(self.ip) as usize;
                     self.ip += 1;
                     let value = self.stack[slot];
                     self.push(value)?;
                 }
-                
                 OpCode::StoreLocal => {
                     let slot = chunk.read_byte(self.ip) as usize;
                     self.ip += 1;
                     let value = self.peek(0)?;
                     self.stack[slot] = value;
                 }
-                
                 OpCode::LoadGlobal => {
                     let idx = chunk.read_byte(self.ip) as usize;
                     self.ip += 1;
+                    if idx >= self.globals.len() {
+                        return Err(SpectreError::coded(ErrorCode::E013, format!("global index {} out of bounds", idx)));
+                    }
                     let value = self.globals[idx];
                     self.push(value)?;
                 }
-                
                 OpCode::StoreGlobal => {
                     let idx = chunk.read_byte(self.ip) as usize;
                     self.ip += 1;
+                    if idx >= self.globals.len() {
+                        return Err(SpectreError::coded(ErrorCode::E013, format!("global index {} out of bounds", idx)));
+                    }
                     let value = self.peek(0)?;
                     self.globals[idx] = value;
                 }
-                
                 OpCode::DefineGlobal => {
                     let idx = chunk.read_byte(self.ip) as usize;
                     self.ip += 1;
+                    if idx >= self.globals.len() {
+                        return Err(SpectreError::coded(ErrorCode::E013, format!("global index {} out of bounds", idx)));
+                    }
                     let value = self.pop()?;
                     self.globals[idx] = value;
                 }
-                
-                // === Specialized Local Access (v1.0 - no operand byte) ===
-                
                 OpCode::LoadLocal0 => {
                     let value = self.stack[0];
                     self.push(value)?;
                 }
-                
                 OpCode::LoadLocal1 => {
                     let value = self.stack[1];
                     self.push(value)?;
                 }
-                
                 OpCode::LoadLocal2 => {
                     let value = self.stack[2];
                     self.push(value)?;
                 }
-                
                 OpCode::StoreLocal0 => {
                     let value = self.peek(0)?;
                     self.stack[0] = value;
                 }
-                
                 OpCode::StoreLocal1 => {
                     let value = self.peek(0)?;
                     self.stack[1] = value;
                 }
-                
                 OpCode::StoreLocal2 => {
                     let value = self.peek(0)?;
                     self.stack[2] = value;
                 }
-                
-                // === Specialized Integer Arithmetic (v1.0) ===
-                
+                OpCode::LoadGlobal0 => {
+                    let value = self.globals[21];
+                    self.push(value)?;
+                }
+                OpCode::LoadGlobal1 => {
+                    let value = self.globals[22];
+                    self.push(value)?;
+                }
+                OpCode::LoadGlobal2 => {
+                    let value = self.globals[23];
+                    self.push(value)?;
+                }
+                OpCode::StoreGlobal0 => {
+                    let value = self.peek(0)?;
+                    self.globals[21] = value;
+                }
+                OpCode::StoreGlobal1 => {
+                    let value = self.peek(0)?;
+                    self.globals[22] = value;
+                }
+                OpCode::StoreGlobal2 => {
+                    let value = self.peek(0)?;
+                    self.globals[23] = value;
+                }
                 OpCode::AddInt => {
                     let b = self.pop()?;
                     let a = self.pop()?;
                     self.push(NanBoxed::integer(a.as_integer() + b.as_integer()))?;
                 }
-                
                 OpCode::SubInt => {
                     let b = self.pop()?;
                     let a = self.pop()?;
                     self.push(NanBoxed::integer(a.as_integer() - b.as_integer()))?;
                 }
-                
                 OpCode::MulInt => {
                     let b = self.pop()?;
                     let a = self.pop()?;
                     self.push(NanBoxed::integer(a.as_integer() * b.as_integer()))?;
                 }
-                
                 OpCode::IncLocal => {
                     let slot = chunk.read_byte(self.ip) as usize;
                     self.ip += 1;
@@ -242,7 +203,6 @@ impl VMNanBox {
                         self.stack[slot] = NanBoxed::number(value.as_number() + 1.0);
                     }
                 }
-                
                 OpCode::DecLocal => {
                     let slot = chunk.read_byte(self.ip) as usize;
                     self.ip += 1;
@@ -253,7 +213,6 @@ impl VMNanBox {
                         self.stack[slot] = NanBoxed::number(value.as_number() - 1.0);
                     }
                 }
-                
                 OpCode::Inc => {
                     let v = self.pop()?;
                     if v.is_integer() {
@@ -264,7 +223,6 @@ impl VMNanBox {
                         return Err(SpectreError::coded(ErrorCode::E031, "inc"));
                     }
                 }
-                
                 OpCode::Dec => {
                     let v = self.pop()?;
                     if v.is_integer() {
@@ -275,22 +233,15 @@ impl VMNanBox {
                         return Err(SpectreError::coded(ErrorCode::E031, "dec"));
                     }
                 }
-                
-                // === Optimized arithmetic - no boxing overhead ===
-                
                 OpCode::Add => {
                     let b = self.pop()?;
                     let a = self.pop()?;
-                    
-                    // Fast path: both numbers
                     if a.is_number() && b.is_number() {
                         self.push(NanBoxed::number(a.as_number() + b.as_number()))?;
                     }
-                    // Fast path: both integers
                     else if a.is_integer() && b.is_integer() {
                         self.push(NanBoxed::integer(a.as_integer() + b.as_integer()))?;
                     }
-                    // Mixed numeric
                     else if let (Some(na), Some(nb)) = (a.as_numeric(), b.as_numeric()) {
                         self.push(NanBoxed::number(na + nb))?;
                     }
@@ -298,11 +249,9 @@ impl VMNanBox {
                         return Err(SpectreError::coded(ErrorCode::E031, "add"));
                     }
                 }
-                
                 OpCode::Sub => {
                     let b = self.pop()?;
                     let a = self.pop()?;
-                    
                     if a.is_number() && b.is_number() {
                         self.push(NanBoxed::number(a.as_number() - b.as_number()))?;
                     } else if a.is_integer() && b.is_integer() {
@@ -313,11 +262,9 @@ impl VMNanBox {
                         return Err(SpectreError::coded(ErrorCode::E031, "sub"));
                     }
                 }
-                
                 OpCode::Mul => {
                     let b = self.pop()?;
                     let a = self.pop()?;
-                    
                     if a.is_number() && b.is_number() {
                         self.push(NanBoxed::number(a.as_number() * b.as_number()))?;
                     } else if a.is_integer() && b.is_integer() {
@@ -328,42 +275,34 @@ impl VMNanBox {
                         return Err(SpectreError::coded(ErrorCode::E031, "mul"));
                     }
                 }
-                
                 OpCode::Div => {
                     let b = self.pop()?;
                     let a = self.pop()?;
-                    
                     let nb = b.as_numeric().ok_or_else(|| SpectreError::coded(ErrorCode::E031, "div"))?;
                     let na = a.as_numeric().ok_or_else(|| SpectreError::coded(ErrorCode::E031, "div"))?;
-                    
                     if nb == 0.0 {
                         return Err(SpectreError::coded(ErrorCode::E040, ""));
                     }
                     self.push(NanBoxed::number(na / nb))?;
                 }
-                
                 OpCode::Mod => {
                     let b = self.pop()?;
                     let a = self.pop()?;
-                    
                     if let (Some(na), Some(nb)) = (a.as_numeric(), b.as_numeric()) {
                         self.push(NanBoxed::number(na % nb))?;
                     } else {
                         return Err(SpectreError::coded(ErrorCode::E031, "mod"));
                     }
                 }
-                
                 OpCode::Pow => {
                     let b = self.pop()?;
                     let a = self.pop()?;
-                    
                     if let (Some(na), Some(nb)) = (a.as_numeric(), b.as_numeric()) {
                         self.push(NanBoxed::number(na.powf(nb)))?;
                     } else {
                         return Err(SpectreError::coded(ErrorCode::E031, "pow"));
                     }
                 }
-                
                 OpCode::Neg => {
                     let v = self.pop()?;
                     if v.is_number() {
@@ -374,21 +313,16 @@ impl VMNanBox {
                         return Err(SpectreError::coded(ErrorCode::E031, "neg"));
                     }
                 }
-                
-                // === Comparisons ===
-                
                 OpCode::Eq => {
                     let b = self.pop()?;
                     let a = self.pop()?;
                     self.push(NanBoxed::boolean(self.values_equal(a, b)))?;
                 }
-                
                 OpCode::Ne => {
                     let b = self.pop()?;
                     let a = self.pop()?;
                     self.push(NanBoxed::boolean(!self.values_equal(a, b)))?;
                 }
-                
                 OpCode::Lt => {
                     let b = self.pop()?;
                     let a = self.pop()?;
@@ -398,7 +332,6 @@ impl VMNanBox {
                         return Err(SpectreError::coded(ErrorCode::E031, "lt"));
                     }
                 }
-                
                 OpCode::Gt => {
                     let b = self.pop()?;
                     let a = self.pop()?;
@@ -408,7 +341,6 @@ impl VMNanBox {
                         return Err(SpectreError::coded(ErrorCode::E031, "gt"));
                     }
                 }
-                
                 OpCode::Le => {
                     let b = self.pop()?;
                     let a = self.pop()?;
@@ -418,7 +350,6 @@ impl VMNanBox {
                         return Err(SpectreError::coded(ErrorCode::E031, "le"));
                     }
                 }
-                
                 OpCode::Ge => {
                     let b = self.pop()?;
                     let a = self.pop()?;
@@ -428,12 +359,10 @@ impl VMNanBox {
                         return Err(SpectreError::coded(ErrorCode::E031, "ge"));
                     }
                 }
-                
                 OpCode::Not => {
                     let v = self.pop()?;
                     self.push(NanBoxed::boolean(!v.is_truthy()))?;
                 }
-                
                 OpCode::And => {
                     let offset = chunk.read_u16(self.ip) as usize;
                     self.ip += 2;
@@ -443,7 +372,6 @@ impl VMNanBox {
                         self.pop()?;
                     }
                 }
-                
                 OpCode::Or => {
                     let offset = chunk.read_u16(self.ip) as usize;
                     self.ip += 2;
@@ -453,15 +381,11 @@ impl VMNanBox {
                         self.pop()?;
                     }
                 }
-                
-                // === Control flow ===
-                
                 OpCode::Jump => {
                     let offset = chunk.read_u16(self.ip) as usize;
                     self.ip += 2;
                     self.ip += offset;
                 }
-                
                 OpCode::JumpIfFalse => {
                     let offset = chunk.read_u16(self.ip) as usize;
                     self.ip += 2;
@@ -469,7 +393,6 @@ impl VMNanBox {
                         self.ip += offset;
                     }
                 }
-                
                 OpCode::JumpIfTrue => {
                     let offset = chunk.read_u16(self.ip) as usize;
                     self.ip += 2;
@@ -477,13 +400,11 @@ impl VMNanBox {
                         self.ip += offset;
                     }
                 }
-                
                 OpCode::Loop => {
                     let offset = chunk.read_u16(self.ip) as usize;
                     self.ip += 2;
                     self.ip -= offset;
                 }
-                
                 OpCode::Return => {
                     let result = if self.stack.is_empty() {
                         NanBoxed::nil()
@@ -492,75 +413,49 @@ impl VMNanBox {
                     };
                     return Ok(result);
                 }
-                
                 OpCode::CheckIterLimit => {
                     self.iteration_count += 1;
                     if self.iteration_count > MAX_ITERATIONS {
                         return Err(SpectreError::coded(ErrorCode::E071, "vm loop"));
                     }
                 }
-                
                 OpCode::Call => {
                     let argc = chunk.read_byte(self.ip) as usize;
                     self.ip += 1;
-                    
                     let callee = self.peek(argc)?;
-                    
-                    // Check if it's a pointer (function or builtin)
                     if callee.is_ptr() {
-                        // SAFETY: is_ptr() check above guarantees valid pointer
                         debug_assert!(!callee.as_ptr().is_null(), "null pointer in Call");
                         let obj = unsafe { &*callee.as_ptr() };
-                        
                         match &obj.data {
                             super::HeapData::String(name) => {
-                                // Builtin function
                                 let result = self.call_builtin(name, argc)?;
-                                // Pop args and callee
                                 for _ in 0..=argc {
                                     self.pop()?;
                                 }
                                 self.push(result)?;
                             }
                             super::HeapData::Function(func) => {
-                                // User-defined function
-                                // Check arity
                                 if argc != func.arity as usize {
                                     return Err(SpectreError::coded(
                                         ErrorCode::E012, 
                                         format!("{}: expected {} args, got {}", func.name, func.arity, argc)
                                     ));
                                 }
-                                
-                                // Check recursion limit
                                 if self.frames.len() >= MAX_FRAMES {
                                     return Err(SpectreError::coded(
                                         ErrorCode::E071, 
                                         format!("stack overflow: max {} frames", MAX_FRAMES)
                                     ));
                                 }
-                                
-                                // Execute function inline (simplified - no call frames)
-                                // For now, execute the function's bytecode directly
                                 let base = self.stack.len() - argc;
-                                
-                                // Save current IP
                                 let saved_ip = self.ip;
                                 let saved_frame_base = self.frame_base;
-                                
-                                // Set up for function execution
                                 self.ip = 0;
                                 self.frame_base = base;
-                                
-                                // Execute function body
                                 let func_chunk = &func.chunk;
                                 let result = self.execute_function_body(func_chunk)?;
-                                
-                                // Restore IP
                                 self.ip = saved_ip;
                                 self.frame_base = saved_frame_base;
-                                
-                                // Pop args and callee, push result
                                 for _ in 0..=argc {
                                     self.pop()?;
                                 }
@@ -574,7 +469,6 @@ impl VMNanBox {
                         return Err(SpectreError::coded(ErrorCode::E011, "not callable"));
                     }
                 }
-                
                 OpCode::List => {
                     let count = chunk.read_byte(self.ip) as usize;
                     self.ip += 1;
@@ -586,12 +480,9 @@ impl VMNanBox {
                     let ptr = HeapObject::new_list(items);
                     self.push(NanBoxed::ptr(ptr))?;
                 }
-                
                 OpCode::Closure => {
-                    // Create a function object from the compiled functions list
                     let func_idx = chunk.read_byte(self.ip) as usize;
                     self.ip += 1;
-                    
                     if func_idx < functions.len() {
                         let func = functions[func_idx].clone();
                         let ptr = HeapObject::new_function(func);
@@ -600,35 +491,28 @@ impl VMNanBox {
                         return Err(SpectreError::coded(ErrorCode::E004, format!("invalid function index {}", func_idx)));
                     }
                 }
-                
                 _ => {
-                    // Unhandled opcode is a bug - fail explicitly
                     return Err(SpectreError::coded(ErrorCode::E004, format!("unhandled opcode {:?}", op)));
                 }
             }
         }
-        
         Ok(if self.stack.is_empty() {
             NanBoxed::nil()
         } else {
             self.pop()?
         })
     }
-    
-    /// Execute a function body (simplified - reuses main loop logic)
     fn execute_function_body(&mut self, chunk: &Chunk) -> SpectreResult<NanBoxed> {
         loop {
             if self.ip >= chunk.code().len() {
                 break;
             }
-            
             let byte = chunk.read_byte(self.ip);
             let op = match OpCode::from_byte(byte) {
                 Some(op) => op,
                 None => return Err(SpectreError::coded(ErrorCode::E004, format!("invalid opcode {}", byte))),
             };
             self.ip += 1;
-            
             match op {
                 OpCode::Return => {
                     return Ok(if self.stack.len() > self.frame_base {
@@ -637,7 +521,6 @@ impl VMNanBox {
                         NanBoxed::nil()
                     });
                 }
-                
                 OpCode::PushConst => {
                     let idx = chunk.read_byte(self.ip);
                     self.ip += 1;
@@ -645,12 +528,10 @@ impl VMNanBox {
                     let nb = self.value_to_nanbox(value);
                     self.push(nb)?;
                 }
-                
                 OpCode::PushNil => self.push(NanBoxed::nil())?,
                 OpCode::PushTrue => self.push(NanBoxed::boolean(true))?,
                 OpCode::PushFalse => self.push(NanBoxed::boolean(false))?,
                 OpCode::Pop => { self.pop()?; }
-                
                 OpCode::LoadLocal | OpCode::LoadLocal0 | OpCode::LoadLocal1 | OpCode::LoadLocal2 => {
                     let slot = match op {
                         OpCode::LoadLocal => {
@@ -666,7 +547,6 @@ impl VMNanBox {
                     let value = self.stack[self.frame_base + slot];
                     self.push(value)?;
                 }
-                
                 OpCode::StoreLocal | OpCode::StoreLocal0 | OpCode::StoreLocal1 | OpCode::StoreLocal2 => {
                     let slot = match op {
                         OpCode::StoreLocal => {
@@ -682,8 +562,6 @@ impl VMNanBox {
                     let value = self.peek(0)?;
                     self.stack[self.frame_base + slot] = value;
                 }
-                
-                // Arithmetic
                 OpCode::Add => {
                     let b = self.pop()?;
                     let a = self.pop()?;
@@ -731,8 +609,6 @@ impl VMNanBox {
                         return Err(SpectreError::coded(ErrorCode::E031, "neg"));
                     }
                 }
-                
-                // Comparison
                 OpCode::Eq => {
                     let b = self.pop()?;
                     let a = self.pop()?;
@@ -761,18 +637,42 @@ impl VMNanBox {
                         return Err(SpectreError::coded(ErrorCode::E031, "gt"));
                     }
                 }
-                
                 OpCode::LoadGlobal => {
                     let idx = chunk.read_byte(self.ip) as usize;
                     self.ip += 1;
+                    if idx >= self.globals.len() {
+                        return Err(SpectreError::coded(ErrorCode::E013, format!("global index {} out of bounds", idx)));
+                    }
                     let value = self.globals[idx];
                     self.push(value)?;
                 }
-                
+                OpCode::LoadGlobal0 => {
+                    let value = self.globals[21];
+                    self.push(value)?;
+                }
+                OpCode::LoadGlobal1 => {
+                    let value = self.globals[22];
+                    self.push(value)?;
+                }
+                OpCode::LoadGlobal2 => {
+                    let value = self.globals[23];
+                    self.push(value)?;
+                }
+                OpCode::StoreGlobal0 => {
+                    let value = self.peek(0)?;
+                    self.globals[21] = value;
+                }
+                OpCode::StoreGlobal1 => {
+                    let value = self.peek(0)?;
+                    self.globals[22] = value;
+                }
+                OpCode::StoreGlobal2 => {
+                    let value = self.peek(0)?;
+                    self.globals[23] = value;
+                }
                 OpCode::Call => {
                     let argc = chunk.read_byte(self.ip) as usize;
                     self.ip += 1;
-                    
                     let callee = self.peek(argc)?;
                     if callee.is_ptr() {
                         let obj = unsafe { &*callee.as_ptr() };
@@ -782,6 +682,20 @@ impl VMNanBox {
                                 self.pop()?;
                             }
                             self.push(result)?;
+                        } else if let super::HeapData::Function(func) = &obj.data {
+                             if argc != func.arity as usize {
+                                return Err(SpectreError::coded(ErrorCode::E012, "arity mismatch"));
+                             }
+                             let saved_ip = self.ip;
+                             let saved_base = self.frame_base;
+                             let base = self.stack.len() - argc;
+                             self.ip = 0;
+                             self.frame_base = base;
+                             let result = self.execute_function_body(&func.chunk)?;
+                             self.ip = saved_ip;
+                             self.frame_base = saved_base;
+                             for _ in 0..=argc { self.pop()?; }
+                             self.push(result)?;
                         } else {
                             return Err(SpectreError::coded(ErrorCode::E011, "not callable in fn"));
                         }
@@ -789,18 +703,32 @@ impl VMNanBox {
                         return Err(SpectreError::coded(ErrorCode::E011, "not callable in fn"));
                     }
                 }
-                
+                OpCode::Jump => {
+                    let offset = chunk.read_u16(self.ip) as usize;
+                    self.ip += 2;
+                    self.ip += offset;
+                }
+                OpCode::JumpIfFalse => {
+                    let offset = chunk.read_u16(self.ip) as usize;
+                    self.ip += 2;
+                    if !self.peek(0)?.is_truthy() {
+                        self.ip += offset;
+                    }
+                }
+                OpCode::Loop => {
+                    let offset = chunk.read_u16(self.ip) as usize;
+                    self.ip += 2;
+                    self.ip -= offset;
+                }
+                OpCode::CheckIterLimit => {
+                }
                 _ => {
                     return Err(SpectreError::coded(ErrorCode::E004, format!("unsupported opcode in function: {:?}", op)));
                 }
             }
         }
-        
         Ok(NanBoxed::nil())
     }
-    
-    // === Stack operations ===
-    
     #[inline(always)]
     fn push(&mut self, value: NanBoxed) -> SpectreResult<()> {
         if self.stack.len() >= STACK_SIZE {
@@ -809,12 +737,10 @@ impl VMNanBox {
         self.stack.push(value);
         Ok(())
     }
-    
     #[inline(always)]
     fn pop(&mut self) -> SpectreResult<NanBoxed> {
         self.stack.pop().ok_or_else(|| SpectreError::coded(ErrorCode::E013, "empty stack"))
     }
-    
     #[inline(always)]
     fn peek(&self, distance: usize) -> SpectreResult<NanBoxed> {
         if self.stack.len() <= distance {
@@ -822,9 +748,6 @@ impl VMNanBox {
         }
         Ok(self.stack[self.stack.len() - 1 - distance])
     }
-    
-    // === Value conversion ===
-    
     fn value_to_nanbox(&self, value: &crate::interp::Value) -> NanBoxed {
         use crate::interp::Value;
         match value {
@@ -837,44 +760,31 @@ impl VMNanBox {
                 let ptr = HeapObject::new_string(s);
                 NanBoxed::ptr(ptr)
             }
-            _ => NanBoxed::nil(), // TODO: handle other types
+            _ => NanBoxed::nil(), 
         }
     }
-    
     fn values_equal(&self, a: NanBoxed, b: NanBoxed) -> bool {
-        // Fast path: identical bits
         if a.bits() == b.bits() {
             return true;
         }
-        
-        // Numeric comparison
         if let (Some(na), Some(nb)) = (a.as_numeric(), b.as_numeric()) {
             return (na - nb).abs() < f64::EPSILON;
         }
-        
-        // String comparison
         if a.is_ptr() && b.is_ptr() {
-            // SAFETY: is_ptr() checks above guarantee valid pointers
             debug_assert!(!a.as_ptr().is_null() && !b.as_ptr().is_null());
             let obj_a = unsafe { &*a.as_ptr() };
             let obj_b = unsafe { &*b.as_ptr() };
-            
             if let (super::HeapData::String(sa), super::HeapData::String(sb)) = (&obj_a.data, &obj_b.data) {
                 return sa == sb;
             }
         }
-        
         false
     }
-    
-    // === Builtins ===
-    
     fn call_builtin(&self, name: &str, argc: usize) -> SpectreResult<NanBoxed> {
         let mut args = Vec::with_capacity(argc);
         for i in 0..argc {
             args.push(self.peek(argc - 1 - i)?);
         }
-        
         match name {
             "log" => {
                 let output: Vec<_> = args.iter().map(|a| format!("{}", a)).collect();
@@ -978,7 +888,6 @@ impl VMNanBox {
         }
     }
 }
-
 impl Default for VMNanBox {
     fn default() -> Self {
         Self::new()

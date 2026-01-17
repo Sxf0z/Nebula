@@ -1,0 +1,12 @@
+# Nebula Benchmark: Fib
+function fib(n) do
+    if n < 2 do
+        give n
+    else
+        give fib(n-1) + fib(n-2)
+    end
+end
+
+log("Starting fib(28)...")
+result = fib(28)
+log("Fib(28):", result)

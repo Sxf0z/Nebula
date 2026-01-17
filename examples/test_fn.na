@@ -1,0 +1,6 @@
+# Test fn keyword
+fn greet(name) do
+    log("Hello,", name)
+end
+
+greet("Nebula")

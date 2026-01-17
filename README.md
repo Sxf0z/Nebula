@@ -13,7 +13,7 @@ A compiled, high-performance scripting language.
 | **State Logic** | `on` / `off` — No true/false |
 | **Safety** | `empty` — No null pointer exceptions |
 | **Speed** | 35x Faster Loops (Global Indexing) |
-| **Optimization** | Constant Folding at compile time |
+| **Optimization** | String Interning & Peephole Optimization |
 | **Syntax** | Use `fn` for speed or `function` for clarity |
 
 ---
@@ -47,10 +47,10 @@ end
 cargo build --release
 
 # Run with VM (fastest)
-./target/release/specter --vm script.na
+./target/release/nebula --vm script.na
 
 # Run with interpreter
-./target/release/specter script.na
+./target/release/nebula script.na
 ```
 
 ---
@@ -100,7 +100,7 @@ end
 ## Installation
 
 ```bash
-git clone https://github.com/your-username/nebula.git
+git clone https://github.com/Sxf0z/Nebula.git
 cd nebula
 cargo build --release
 ```

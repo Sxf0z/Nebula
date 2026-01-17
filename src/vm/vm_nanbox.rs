@@ -1,3 +1,4 @@
+use super::intern::StringInterner;
 use super::{Chunk, CompiledFunction, HeapObject, NanBoxed, OpCode};
 use crate::error::{ErrorCode, NebulaError, NebulaResult};
 const STACK_SIZE: usize = 256;
@@ -24,23 +25,24 @@ pub struct VMNanBox {
     globals: Vec<NanBoxed>,
     global_names: Vec<String>,
     iteration_count: usize,
+    interner: StringInterner,
 }
 impl VMNanBox {
     pub fn new() -> Self {
-        let mut globals = vec![NanBoxed::nil(); MAX_GLOBALS];
-        for (i, name) in BUILTIN_NAMES.iter().enumerate() {
-            let ptr = HeapObject::new_string(name);
-            globals[i] = NanBoxed::ptr(ptr);
-        }
-        Self {
+        let mut vm = Self {
             stack: Vec::with_capacity(STACK_SIZE),
             frames: Vec::with_capacity(MAX_FRAMES),
             ip: 0,
             frame_base: 0,
-            globals,
+            globals: vec![NanBoxed::nil(); MAX_GLOBALS],
             global_names: Vec::new(),
             iteration_count: 0,
+            interner: StringInterner::new(),
+        };
+        for (i, name) in BUILTIN_NAMES.iter().enumerate() {
+            vm.globals[i] = vm.interner.intern(name);
         }
+        vm
     }
     pub fn run(&mut self, chunk: &Chunk, global_names: &[String]) -> NebulaResult<NanBoxed> {
         self.run_with_functions(chunk, global_names, &[])
@@ -800,7 +802,7 @@ impl VMNanBox {
         }
         Ok(self.stack[self.stack.len() - 1 - distance])
     }
-    fn value_to_nanbox(&self, value: &crate::interp::Value) -> NanBoxed {
+    fn value_to_nanbox(&mut self, value: &crate::interp::Value) -> NanBoxed {
         use crate::interp::Value;
         match value {
             Value::Number(n) => NanBoxed::number(*n),
@@ -808,10 +810,7 @@ impl VMNanBox {
             Value::Float(f) => NanBoxed::number(*f),
             Value::Bool(b) => NanBoxed::boolean(*b),
             Value::Nil => NanBoxed::nil(),
-            Value::String(s) => {
-                let ptr = HeapObject::new_string(s);
-                NanBoxed::ptr(ptr)
-            }
+            Value::String(s) => self.interner.intern(s),
             _ => NanBoxed::nil(),
         }
     }

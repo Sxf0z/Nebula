@@ -6,3 +6,10 @@ Cargo.lock
 .idea/
 *.swp
 *.log
+/skills/
+/examples/
+/docs/
+/nebula-vscode/
+\.agent
+.agent/
+

@@ -68,6 +68,13 @@ impl Chunk {
     pub fn code(&self) -> &[u8] {
         &self.code
     }
+    pub fn code_mut(&mut self) -> &mut Vec<u8> {
+        &mut self.code
+    }
+    pub fn write(&mut self, byte: u8, line: usize) {
+        self.code.push(byte);
+        self.lines.push(line);
+    }
 }
 impl Default for Chunk {
     fn default() -> Self {

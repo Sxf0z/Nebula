@@ -1,6 +1,6 @@
 # Nebula Benchmark
 
-# 1. Loop (900k iterations to be safe under 1M limit)
+# Loop test
 log("Starting loop...")
 i = 0
 while i < 500000 do
@@ -8,7 +8,7 @@ while i < 500000 do
 end
 log("Loop finished:", i)
 
-# 2. Math / Recursion
+# Fibonacci
 function fib(n) do
     if n < 2 do
         give n
@@ -20,3 +20,4 @@ end
 log("Starting fib(25)...")
 result = fib(25)
 log("Fib(25):", result)
+

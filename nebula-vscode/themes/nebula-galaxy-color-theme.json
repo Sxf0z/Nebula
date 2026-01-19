@@ -25,8 +25,15 @@
         "terminal.foreground": "#e0e0ff",
         "terminal.ansiCyan": "#89ddff",
         "terminal.ansiMagenta": "#c792ea",
+        "terminal.ansiBlue": "#82aaff",
         "panel.background": "#0a0a14",
-        "panelTitle.activeForeground": "#89ddff"
+        "panelTitle.activeForeground": "#89ddff",
+        "focusBorder": "#89ddff50",
+        "input.background": "#1a1a2e",
+        "input.foreground": "#e0e0ff",
+        "input.border": "#3d3d5c",
+        "button.background": "#c792ea",
+        "button.foreground": "#ffffff"
     },
     "tokenColors": [
         {
@@ -77,6 +84,31 @@
         },
         {
             "scope": [
+                "keyword.control.module"
+            ],
+            "settings": {
+                "foreground": "#bb80b3"
+            }
+        },
+        {
+            "scope": [
+                "keyword.control.error"
+            ],
+            "settings": {
+                "foreground": "#ff5572"
+            }
+        },
+        {
+            "scope": [
+                "keyword.other.memory"
+            ],
+            "settings": {
+                "foreground": "#ffcb6b",
+                "fontStyle": "italic"
+            }
+        },
+        {
+            "scope": [
                 "keyword.other.fn",
                 "storage.type"
             ],
@@ -91,6 +123,14 @@
             ],
             "settings": {
                 "foreground": "#89ddff"
+            }
+        },
+        {
+            "scope": [
+                "support.type"
+            ],
+            "settings": {
+                "foreground": "#4ec9b0"
             }
         },
         {
@@ -121,7 +161,23 @@
         },
         {
             "scope": [
+                "keyword.operator.arrow"
+            ],
+            "settings": {
+                "foreground": "#c792ea"
+            }
+        },
+        {
+            "scope": [
                 "punctuation"
+            ],
+            "settings": {
+                "foreground": "#89ddff"
+            }
+        },
+        {
+            "scope": [
+                "constant.character.escape"
             ],
             "settings": {
                 "foreground": "#89ddff"

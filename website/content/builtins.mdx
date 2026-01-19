@@ -1,0 +1,112 @@
+---
+title: "Built-in Functions"
+description: "Reference for all built-in functions in Nebula."
+---
+
+# Built-in Functions
+
+Nebula provides essential built-in functions that are always available.
+
+## I/O Functions
+
+### log(...args)
+
+Prints one or more values to standard output, separated by spaces.
+
+```nebula
+log("Hello, World!")
+log("Sum:", 10 + 20)
+log("Name:", "Alex", "Age:", 25)
+
+# Output:
+# Hello, World!
+# Sum: 30
+# Name: Alex Age: 25
+```
+
+### get()
+
+Reads a line of input from the user. Returns a string.
+
+```nebula
+log("What is your name?")
+perm name = get()
+log("Hello,", name)
+```
+
+## Math Functions
+
+### sqrt(x)
+
+Returns the square root of a number.
+
+```nebula
+log(sqrt(16))   # 4
+log(sqrt(2))    # 1.4142135...
+log(sqrt(144))  # 12
+```
+
+### abs(x)
+
+Returns the absolute value of a number.
+
+```nebula
+log(abs(-10))   # 10
+log(abs(5))     # 5
+log(abs(-3.14)) # 3.14
+```
+
+## Type Functions
+
+### typeof(x)
+
+Returns the type name of a value as a string.
+
+```nebula
+log(typeof(42))        # "int"
+log(typeof(3.14))      # "fl"
+log(typeof("hello"))   # "wrd"
+log(typeof(on))        # "bool"
+log(typeof([1, 2]))    # "lst"
+log(typeof(empty))     # "nil"
+```
+
+**Type Names:**
+| Value | typeof Result |
+| :--- | :--- |
+| Integer | `int` |
+| Float | `fl` |
+| String | `wrd` |
+| Boolean | `bool` |
+| List | `lst` |
+| Map | `map` |
+| Tuple | `tup` |
+| Function | `fn` |
+| Null | `nil` |
+
+## Collection Functions
+
+### len(collection)
+
+Returns the number of elements in a list, map, or characters in a string.
+
+```nebula
+log(len([1, 2, 3]))     # 3
+log(len("hello"))       # 5
+log(len([]))            # 0
+log(len({"a": 1}))      # 1
+```
+
+## Example: Interactive Program
+
+```nebula
+log("=== Calculator ===")
+log("Enter first number:")
+perm a = get()
+log("Enter second number:")
+perm b = get()
+
+# Note: get() returns strings, need numeric conversion
+perm sum = a + b
+log("Result:", sum)
+```

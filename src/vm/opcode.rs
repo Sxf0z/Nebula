@@ -66,6 +66,7 @@ pub enum OpCode {
     StoreGlobal0 = 123,
     StoreGlobal1 = 124,
     StoreGlobal2 = 125,
+    CallBuiltin = 130,
 }
 impl OpCode {
     pub fn operand_size(self) -> usize {
@@ -128,7 +129,8 @@ impl OpCode {
             | OpCode::IterNext
             | OpCode::Throw
             | OpCode::IncLocal
-            | OpCode::DecLocal => 1,
+            | OpCode::DecLocal
+            | OpCode::CallBuiltin => 2,
             OpCode::Jump
             | OpCode::JumpIfFalse
             | OpCode::JumpIfTrue
@@ -204,6 +206,7 @@ impl OpCode {
             123 => Some(OpCode::StoreGlobal0),
             124 => Some(OpCode::StoreGlobal1),
             125 => Some(OpCode::StoreGlobal2),
+            130 => Some(OpCode::CallBuiltin),
             _ => None,
         }
     }

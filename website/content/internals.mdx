@@ -1,0 +1,175 @@
+---
+title: "Internals"
+description: "NanBoxing, bytecode VM, and performance optimizations."
+---
+
+# Engine Internals
+
+Nebula achieves high performance through several low-level optimizations.
+
+## Architecture Overview
+
+```
+Source Code (.na)
+      ↓
+   Lexer → Tokens
+      ↓
+   Parser → AST
+      ↓
+   Compiler → Bytecode
+      ↓
+   VM → Execution
+```
+
+## NanBoxing
+
+All values in Nebula are stored in 64 bits using NaN-boxing:
+
+- **Floats**: Stored as-is (IEEE 754 double)
+- **Integers, Pointers, Booleans**: Encoded in the NaN space
+
+**Benefits:**
+- No heap allocation for primitives
+- All values fit in a single register
+- Efficient value passing
+
+```
+64-bit IEEE 754 Float:
+┌─────────────────────────────────────────────────────┐
+│ Sign │ Exponent (11) │ Mantissa (52)               │
+└─────────────────────────────────────────────────────┘
+
+NaN Space (for encoding other types):
+┌─────────────────────────────────────────────────────┐
+│  1  │ 11111111111 │ Type Tag │ Payload (48 bits)   │
+└─────────────────────────────────────────────────────┘
+```
+
+## String Interning
+
+All strings are immutable and interned:
+
+```nebula
+perm a = "hello"
+perm b = "hello"
+# a and b point to the SAME memory location
+```
+
+**Benefits:**
+- String comparison is O(1) (pointer comparison)
+- Memory efficient for repeated strings
+- Cache-friendly access patterns
+
+## Peephole Optimization
+
+The compiler performs bytecode optimization:
+
+```
+Before:                    After:
+LOAD_CONST 2              LOAD_CONST 5
+LOAD_CONST 3              
+ADD                       
+
+Before:                    After:
+LOAD_LOCAL 0              LOAD_LOCAL_0
+                          (single-byte instruction)
+```
+
+**Optimizations:**
+- Constant folding
+- Dead code elimination  
+- Specialized load/store instructions
+- Integer-specific arithmetic
+
+## Global Indexing
+
+Variables are assigned numeric indices at compile time:
+
+```nebula
+# Source
+perm x = 10
+perm y = 20
+log(x + y)
+```
+
+```
+# Compiled bytecode uses indices
+LOAD_GLOBAL 0    # x is index 0
+LOAD_GLOBAL 1    # y is index 1
+ADD
+CALL_BUILTIN 0   # log is builtin 0
+```
+
+No hash map lookups at runtime.
+
+## Bytecode Instructions
+
+The VM supports ~50 opcodes:
+
+### Stack Operations
+| Opcode | Description |
+|--------|-------------|
+| `PUSH_CONST` | Push constant to stack |
+| `PUSH_NIL` | Push nil value |
+| `PUSH_TRUE/FALSE` | Push boolean |
+| `POP` | Pop and discard |
+| `DUP` | Duplicate top value |
+
+### Arithmetic
+| Opcode | Description |
+|--------|-------------|
+| `ADD/SUB/MUL/DIV` | Arithmetic ops |
+| `MOD` | Modulus |
+| `POW` | Power |
+| `NEG` | Negation |
+
+### Comparison
+| Opcode | Description |
+|--------|-------------|
+| `EQ/NE` | Equality |
+| `LT/GT/LE/GE` | Comparison |
+
+### Control Flow
+| Opcode | Description |
+|--------|-------------|
+| `JUMP` | Unconditional jump |
+| `JUMP_IF_FALSE` | Conditional jump |
+| `LOOP` | Loop back |
+| `CALL` | Call function |
+| `RETURN` | Return from function |
+
+### Collections
+| Opcode | Description |
+|--------|-------------|
+| `LIST` | Create list |
+| `MAP` | Create map |
+| `INDEX` | Get element |
+| `STORE_INDEX` | Set element |
+| `LEN` | Get length |
+
+## Memory Safety
+
+Nebula is written in Rust:
+
+- No use-after-free bugs
+- No buffer overflows
+- No data races
+- Sandboxed script execution
+
+The VM does not allow arbitrary pointer manipulation from scripts.
+
+## Value Types
+
+Internal runtime type representation:
+
+| Type | Rust Type | Description |
+|------|-----------|-------------|
+| `nb` | `f64` | Generic number |
+| `int` | `i64` | Integer |
+| `fl` | `f64` | Float |
+| `bool` | `bool` | Boolean |
+| `wrd` | `String` | String (interned) |
+| `lst` | `Vec<Value>` | List |
+| `map` | `HashMap` | Map |
+| `tup` | `Vec<Value>` | Tuple |
+| `fn` | `Rc<Function>` | Function |

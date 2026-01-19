@@ -10,6 +10,42 @@ pub const BUILTIN_NAMES: [&str; BUILTIN_COUNT] = [
     "log", "typeof", "sqrt", "abs", "len", "floor", "ceil", "round", "pow", "sin", "cos", "tan",
     "exp", "ln", "get", "rnd", "dbg", "now", "sleep", "str", "num",
 ];
+
+macro_rules! binary_op {
+    ($self:expr, $op:tt, $name:literal) => {{
+        let b = $self.pop()?;
+        let a = $self.pop()?;
+        if a.is_number() && b.is_number() {
+            $self.push(NanBoxed::number(a.as_number() $op b.as_number()))?;
+        } else if a.is_integer() && b.is_integer() {
+            $self.push(NanBoxed::integer(a.as_integer() $op b.as_integer()))?;
+        } else if let (Some(na), Some(nb)) = (a.as_numeric(), b.as_numeric()) {
+            $self.push(NanBoxed::number(na $op nb))?;
+        } else {
+            return Err(NebulaError::coded(ErrorCode::E031, $name));
+        }
+    }};
+}
+
+macro_rules! int_op {
+    ($self:expr, $op:tt) => {{
+        let b = $self.pop()?;
+        let a = $self.pop()?;
+        $self.push(NanBoxed::integer(a.as_integer() $op b.as_integer()))?;
+    }};
+}
+
+macro_rules! cmp_op {
+    ($self:expr, $op:tt, $name:literal) => {{
+        let b = $self.pop()?;
+        let a = $self.pop()?;
+        if let (Some(na), Some(nb)) = (a.as_numeric(), b.as_numeric()) {
+            $self.push(NanBoxed::boolean(na $op nb))?;
+        } else {
+            return Err(NebulaError::coded(ErrorCode::E031, $name));
+        }
+    }};
+}
 #[derive(Clone)]
 #[allow(dead_code)]
 struct CallFrame {
@@ -200,21 +236,9 @@ impl VMNanBox {
                     let value = self.peek(0)?;
                     self.globals[23] = value;
                 }
-                OpCode::AddInt => {
-                    let b = self.pop()?;
-                    let a = self.pop()?;
-                    self.push(NanBoxed::integer(a.as_integer() + b.as_integer()))?;
-                }
-                OpCode::SubInt => {
-                    let b = self.pop()?;
-                    let a = self.pop()?;
-                    self.push(NanBoxed::integer(a.as_integer() - b.as_integer()))?;
-                }
-                OpCode::MulInt => {
-                    let b = self.pop()?;
-                    let a = self.pop()?;
-                    self.push(NanBoxed::integer(a.as_integer() * b.as_integer()))?;
-                }
+                OpCode::AddInt => int_op!(self, +),
+                OpCode::SubInt => int_op!(self, -),
+                OpCode::MulInt => int_op!(self, *),
                 OpCode::IncLocal => {
                     let slot = chunk.read_byte(self.ip) as usize;
                     self.ip += 1;
@@ -255,45 +279,9 @@ impl VMNanBox {
                         return Err(NebulaError::coded(ErrorCode::E031, "dec"));
                     }
                 }
-                OpCode::Add => {
-                    let b = self.pop()?;
-                    let a = self.pop()?;
-                    if a.is_number() && b.is_number() {
-                        self.push(NanBoxed::number(a.as_number() + b.as_number()))?;
-                    } else if a.is_integer() && b.is_integer() {
-                        self.push(NanBoxed::integer(a.as_integer() + b.as_integer()))?;
-                    } else if let (Some(na), Some(nb)) = (a.as_numeric(), b.as_numeric()) {
-                        self.push(NanBoxed::number(na + nb))?;
-                    } else {
-                        return Err(NebulaError::coded(ErrorCode::E031, "add"));
-                    }
-                }
-                OpCode::Sub => {
-                    let b = self.pop()?;
-                    let a = self.pop()?;
-                    if a.is_number() && b.is_number() {
-                        self.push(NanBoxed::number(a.as_number() - b.as_number()))?;
-                    } else if a.is_integer() && b.is_integer() {
-                        self.push(NanBoxed::integer(a.as_integer() - b.as_integer()))?;
-                    } else if let (Some(na), Some(nb)) = (a.as_numeric(), b.as_numeric()) {
-                        self.push(NanBoxed::number(na - nb))?;
-                    } else {
-                        return Err(NebulaError::coded(ErrorCode::E031, "sub"));
-                    }
-                }
-                OpCode::Mul => {
-                    let b = self.pop()?;
-                    let a = self.pop()?;
-                    if a.is_number() && b.is_number() {
-                        self.push(NanBoxed::number(a.as_number() * b.as_number()))?;
-                    } else if a.is_integer() && b.is_integer() {
-                        self.push(NanBoxed::integer(a.as_integer() * b.as_integer()))?;
-                    } else if let (Some(na), Some(nb)) = (a.as_numeric(), b.as_numeric()) {
-                        self.push(NanBoxed::number(na * nb))?;
-                    } else {
-                        return Err(NebulaError::coded(ErrorCode::E031, "mul"));
-                    }
-                }
+                OpCode::Add => binary_op!(self, +, "add"),
+                OpCode::Sub => binary_op!(self, -, "sub"),
+                OpCode::Mul => binary_op!(self, *, "mul"),
                 OpCode::Div => {
                     let b = self.pop()?;
                     let a = self.pop()?;
@@ -346,42 +334,10 @@ impl VMNanBox {
                     let a = self.pop()?;
                     self.push(NanBoxed::boolean(!self.values_equal(a, b)))?;
                 }
-                OpCode::Lt => {
-                    let b = self.pop()?;
-                    let a = self.pop()?;
-                    if let (Some(na), Some(nb)) = (a.as_numeric(), b.as_numeric()) {
-                        self.push(NanBoxed::boolean(na < nb))?;
-                    } else {
-                        return Err(NebulaError::coded(ErrorCode::E031, "lt"));
-                    }
-                }
-                OpCode::Gt => {
-                    let b = self.pop()?;
-                    let a = self.pop()?;
-                    if let (Some(na), Some(nb)) = (a.as_numeric(), b.as_numeric()) {
-                        self.push(NanBoxed::boolean(na > nb))?;
-                    } else {
-                        return Err(NebulaError::coded(ErrorCode::E031, "gt"));
-                    }
-                }
-                OpCode::Le => {
-                    let b = self.pop()?;
-                    let a = self.pop()?;
-                    if let (Some(na), Some(nb)) = (a.as_numeric(), b.as_numeric()) {
-                        self.push(NanBoxed::boolean(na <= nb))?;
-                    } else {
-                        return Err(NebulaError::coded(ErrorCode::E031, "le"));
-                    }
-                }
-                OpCode::Ge => {
-                    let b = self.pop()?;
-                    let a = self.pop()?;
-                    if let (Some(na), Some(nb)) = (a.as_numeric(), b.as_numeric()) {
-                        self.push(NanBoxed::boolean(na >= nb))?;
-                    } else {
-                        return Err(NebulaError::coded(ErrorCode::E031, "ge"));
-                    }
-                }
+                OpCode::Lt => cmp_op!(self, <, "lt"),
+                OpCode::Gt => cmp_op!(self, >, "gt"),
+                OpCode::Le => cmp_op!(self, <=, "le"),
+                OpCode::Ge => cmp_op!(self, >=, "ge"),
                 OpCode::Not => {
                     let v = self.pop()?;
                     self.push(NanBoxed::boolean(!v.is_truthy()))?;
@@ -494,6 +450,17 @@ impl VMNanBox {
                     } else {
                         return Err(NebulaError::coded(ErrorCode::E011, "not callable"));
                     }
+                }
+                OpCode::CallBuiltin => {
+                    let builtin_idx = chunk.read_byte(self.ip) as usize;
+                    self.ip += 1;
+                    let argc = chunk.read_byte(self.ip) as usize;
+                    self.ip += 1;
+                    let result = self.call_builtin_by_index(builtin_idx, argc)?;
+                    for _ in 0..argc {
+                        self.pop()?;
+                    }
+                    self.push(result)?;
                 }
                 OpCode::List => {
                     let count = chunk.read_byte(self.ip) as usize;
@@ -770,6 +737,17 @@ impl VMNanBox {
                     self.ip += 2;
                     self.ip -= offset;
                 }
+                OpCode::CallBuiltin => {
+                    let builtin_idx = chunk.read_byte(self.ip) as usize;
+                    self.ip += 1;
+                    let argc = chunk.read_byte(self.ip) as usize;
+                    self.ip += 1;
+                    let result = self.call_builtin_by_index(builtin_idx, argc)?;
+                    for _ in 0..argc {
+                        self.pop()?;
+                    }
+                    self.push(result)?;
+                }
                 OpCode::CheckIterLimit => {}
                 _ => {
                     return Err(NebulaError::coded(
@@ -966,6 +944,233 @@ impl VMNanBox {
                 Ok(NanBoxed::number(n.cos()))
             }
             _ => Err(NebulaError::coded(ErrorCode::E010, name)),
+        }
+    }
+    fn call_builtin_by_index(&self, index: usize, argc: usize) -> NebulaResult<NanBoxed> {
+        let mut args = Vec::with_capacity(argc);
+        for i in 0..argc {
+            args.push(self.peek(argc - 1 - i)?);
+        }
+        match index {
+            0 => {
+                let output: Vec<_> = args.iter().map(|a| format!("{}", a)).collect();
+                println!("{}", output.join(" "));
+                Ok(NanBoxed::nil())
+            }
+            1 => {
+                if args.is_empty() {
+                    return Err(NebulaError::coded(ErrorCode::E012, "typeof"));
+                }
+                let type_name = if args[0].is_nil() {
+                    "nil"
+                } else if args[0].is_bool() {
+                    "bool"
+                } else if args[0].is_number() {
+                    "nb"
+                } else if args[0].is_integer() {
+                    "int"
+                } else if args[0].is_ptr() {
+                    let obj = unsafe { &*args[0].as_ptr() };
+                    match &obj.data {
+                        super::HeapData::String(_) => "wrd",
+                        super::HeapData::List(_) => "lst",
+                        super::HeapData::Map(_) => "map",
+                        super::HeapData::Function(_) => "fn",
+                    }
+                } else {
+                    "unknown"
+                };
+                let ptr = HeapObject::new_string(type_name);
+                Ok(NanBoxed::ptr(ptr))
+            }
+            2 => {
+                if args.is_empty() {
+                    return Err(NebulaError::coded(ErrorCode::E012, "sqrt"));
+                }
+                let n = args[0]
+                    .as_numeric()
+                    .ok_or_else(|| NebulaError::coded(ErrorCode::E031, "sqrt"))?;
+                Ok(NanBoxed::number(n.sqrt()))
+            }
+            3 => {
+                if args.is_empty() {
+                    return Err(NebulaError::coded(ErrorCode::E012, "abs"));
+                }
+                if args[0].is_integer() {
+                    Ok(NanBoxed::integer(args[0].as_integer().abs()))
+                } else if args[0].is_number() {
+                    Ok(NanBoxed::number(args[0].as_number().abs()))
+                } else {
+                    Err(NebulaError::coded(ErrorCode::E031, "abs"))
+                }
+            }
+            4 => {
+                if args.is_empty() {
+                    return Err(NebulaError::coded(ErrorCode::E012, "len"));
+                }
+                if args[0].is_ptr() {
+                    let obj = unsafe { &*args[0].as_ptr() };
+                    let len = match &obj.data {
+                        super::HeapData::String(s) => s.len(),
+                        super::HeapData::List(l) => l.len(),
+                        super::HeapData::Map(m) => m.len(),
+                        super::HeapData::Function(_) => 0,
+                    };
+                    Ok(NanBoxed::integer(len as i64))
+                } else {
+                    Err(NebulaError::coded(ErrorCode::E031, "len"))
+                }
+            }
+            5 => {
+                if args.is_empty() {
+                    return Err(NebulaError::coded(ErrorCode::E012, "floor"));
+                }
+                let n = args[0]
+                    .as_numeric()
+                    .ok_or_else(|| NebulaError::coded(ErrorCode::E031, "floor"))?;
+                Ok(NanBoxed::number(n.floor()))
+            }
+            6 => {
+                if args.is_empty() {
+                    return Err(NebulaError::coded(ErrorCode::E012, "ceil"));
+                }
+                let n = args[0]
+                    .as_numeric()
+                    .ok_or_else(|| NebulaError::coded(ErrorCode::E031, "ceil"))?;
+                Ok(NanBoxed::number(n.ceil()))
+            }
+            7 => {
+                if args.is_empty() {
+                    return Err(NebulaError::coded(ErrorCode::E012, "round"));
+                }
+                let n = args[0]
+                    .as_numeric()
+                    .ok_or_else(|| NebulaError::coded(ErrorCode::E031, "round"))?;
+                Ok(NanBoxed::number(n.round()))
+            }
+            8 => {
+                if args.len() < 2 {
+                    return Err(NebulaError::coded(ErrorCode::E012, "pow"));
+                }
+                let base = args[0]
+                    .as_numeric()
+                    .ok_or_else(|| NebulaError::coded(ErrorCode::E031, "pow"))?;
+                let exp = args[1]
+                    .as_numeric()
+                    .ok_or_else(|| NebulaError::coded(ErrorCode::E031, "pow"))?;
+                Ok(NanBoxed::number(base.powf(exp)))
+            }
+            9 => {
+                if args.is_empty() {
+                    return Err(NebulaError::coded(ErrorCode::E012, "sin"));
+                }
+                let n = args[0]
+                    .as_numeric()
+                    .ok_or_else(|| NebulaError::coded(ErrorCode::E031, "sin"))?;
+                Ok(NanBoxed::number(n.sin()))
+            }
+            10 => {
+                if args.is_empty() {
+                    return Err(NebulaError::coded(ErrorCode::E012, "cos"));
+                }
+                let n = args[0]
+                    .as_numeric()
+                    .ok_or_else(|| NebulaError::coded(ErrorCode::E031, "cos"))?;
+                Ok(NanBoxed::number(n.cos()))
+            }
+            11 => {
+                if args.is_empty() {
+                    return Err(NebulaError::coded(ErrorCode::E012, "tan"));
+                }
+                let n = args[0]
+                    .as_numeric()
+                    .ok_or_else(|| NebulaError::coded(ErrorCode::E031, "tan"))?;
+                Ok(NanBoxed::number(n.tan()))
+            }
+            12 => {
+                if args.is_empty() {
+                    return Err(NebulaError::coded(ErrorCode::E012, "exp"));
+                }
+                let n = args[0]
+                    .as_numeric()
+                    .ok_or_else(|| NebulaError::coded(ErrorCode::E031, "exp"))?;
+                Ok(NanBoxed::number(n.exp()))
+            }
+            13 => {
+                if args.is_empty() {
+                    return Err(NebulaError::coded(ErrorCode::E012, "ln"));
+                }
+                let n = args[0]
+                    .as_numeric()
+                    .ok_or_else(|| NebulaError::coded(ErrorCode::E031, "ln"))?;
+                Ok(NanBoxed::number(n.ln()))
+            }
+            14 => Ok(NanBoxed::nil()),
+            15 => {
+                use std::time::{SystemTime, UNIX_EPOCH};
+                let seed = SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .map(|d| d.as_nanos())
+                    .unwrap_or(0);
+                let random = ((seed as u64).wrapping_mul(1103515245).wrapping_add(12345) >> 16) as f64 / 32768.0;
+                Ok(NanBoxed::number(random % 1.0))
+            }
+            16 => {
+                for arg in &args {
+                    eprintln!("[DBG] {:?}", arg);
+                }
+                Ok(NanBoxed::nil())
+            }
+            17 => {
+                use std::time::{SystemTime, UNIX_EPOCH};
+                let now = SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .map(|d| d.as_secs_f64())
+                    .unwrap_or(0.0);
+                Ok(NanBoxed::number(now))
+            }
+            18 => {
+                if args.is_empty() {
+                    return Err(NebulaError::coded(ErrorCode::E012, "sleep"));
+                }
+                let ms = args[0]
+                    .as_numeric()
+                    .ok_or_else(|| NebulaError::coded(ErrorCode::E031, "sleep"))?;
+                std::thread::sleep(std::time::Duration::from_millis(ms as u64));
+                Ok(NanBoxed::nil())
+            }
+            19 => {
+                if args.is_empty() {
+                    return Err(NebulaError::coded(ErrorCode::E012, "str"));
+                }
+                let s = format!("{}", args[0]);
+                let ptr = HeapObject::new_string(&s);
+                Ok(NanBoxed::ptr(ptr))
+            }
+            20 => {
+                if args.is_empty() {
+                    return Err(NebulaError::coded(ErrorCode::E012, "num"));
+                }
+                if args[0].is_number() {
+                    Ok(args[0])
+                } else if args[0].is_integer() {
+                    Ok(NanBoxed::number(args[0].as_integer() as f64))
+                } else if args[0].is_ptr() {
+                    let obj = unsafe { &*args[0].as_ptr() };
+                    if let super::HeapData::String(s) = &obj.data {
+                        if let Ok(n) = s.parse::<f64>() {
+                            return Ok(NanBoxed::number(n));
+                        }
+                    }
+                    Err(NebulaError::coded(ErrorCode::E031, "num"))
+                } else {
+                    Err(NebulaError::coded(ErrorCode::E031, "num"))
+                }
+            }
+            _ => Err(NebulaError::coded(
+                ErrorCode::E010,
+                format!("builtin index {}", index),
+            )),
         }
     }
 }

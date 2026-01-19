@@ -399,6 +399,17 @@ impl Compiler {
                 Ok(())
             }
             Expr::Call { callee, args } => {
+                if let Expr::Variable(name) = callee.as_ref() {
+                    if let Some(builtin_idx) = BUILTIN_NAMES.iter().position(|n| *n == name) {
+                        for arg in args {
+                            self.compile_expr(arg)?;
+                        }
+                        self.emit(OpCode::CallBuiltin, line);
+                        self.emit_byte(builtin_idx as u8, line);
+                        self.emit_byte(args.len() as u8, line);
+                        return Ok(());
+                    }
+                }
                 self.compile_expr(callee)?;
                 for arg in args {
                     self.compile_expr(arg)?;

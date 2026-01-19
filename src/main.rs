@@ -7,6 +7,30 @@ use std::time::Instant;
 use colored::Colorize;
 use nebula::{Compiler, Interpreter, Lexer, NebulaError, Parser, Value, VM};
 
+#[cfg(windows)]
+fn enable_ansi_support() {
+    use std::os::windows::io::AsRawHandle;
+    const ENABLE_VIRTUAL_TERMINAL_PROCESSING: u32 = 0x0004;
+    
+    unsafe {
+        let handle = std::io::stdout().as_raw_handle();
+        let mut mode: u32 = 0;
+        
+        #[link(name = "kernel32")]
+        extern "system" {
+            fn GetConsoleMode(handle: *mut std::ffi::c_void, mode: *mut u32) -> i32;
+            fn SetConsoleMode(handle: *mut std::ffi::c_void, mode: u32) -> i32;
+        }
+        
+        if GetConsoleMode(handle as *mut _, &mut mode) != 0 {
+            let _ = SetConsoleMode(handle as *mut _, mode | ENABLE_VIRTUAL_TERMINAL_PROCESSING);
+        }
+    }
+}
+
+#[cfg(not(windows))]
+fn enable_ansi_support() {}
+
 const BANNER: &str = r#"
 ▀█▄    ▀█▀         ▀██                ▀██          
  █▀█    █    ▄▄▄▄   ██ ▄▄▄  ▄▄▄ ▄▄▄    ██    ▄▄▄▄  
@@ -16,6 +40,8 @@ const BANNER: &str = r#"
 "#;
 
 fn main() {
+    enable_ansi_support();
+    
     let args: Vec<String> = env::args().collect();
     let (use_vm, file_path) = parse_args(&args);
 
@@ -35,6 +61,9 @@ fn parse_args(args: &[String]) -> (bool, Option<String>) {
         } else if arg == "--help" || arg == "-h" {
             print_usage();
             process::exit(0);
+        } else if arg == "--version" || arg == "-v" {
+            println!("Nebula 1.0.0");
+            process::exit(0);
         } else if arg.starts_with('-') {
             eprintln!("{} Unknown flag: {}", "[ERROR]".bold().red(), arg);
             print_usage();
@@ -49,7 +78,7 @@ fn parse_args(args: &[String]) -> (bool, Option<String>) {
 
 fn print_usage() {
     println!("{}", BANNER.cyan());
-    println!("{}", "  Logic is Electric.".purple().italic());
+
     println!();
     println!("{}", "USAGE:".bold().white());
     println!(
@@ -71,6 +100,7 @@ fn print_usage() {
     println!();
     println!("{}", "OPTIONS:".bold().white());
     println!("  {}    Use bytecode VM (35x faster)", "--vm".yellow());
+    println!("  {}     Show version info", "--version".yellow());
     println!("  {}  Show this message", "--help".yellow());
 }
 
@@ -190,6 +220,7 @@ fn run_interpreter(source: &str, interpreter: &mut Interpreter) -> Result<Value,
 
     let mut parser = Parser::new(tokens);
     let program = parser.parse_program()?;
+
     interpreter.interpret(&program)
 }
 

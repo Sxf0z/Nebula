@@ -62,7 +62,7 @@
         }
     },
     "indentationRules": {
-        "increaseIndentPattern": "\\b(do|if|while|for|function|fn|else|elsif)\\b.*$",
-        "decreaseIndentPattern": "^\\s*(end|else|elsif)\\b"
+        "increaseIndentPattern": "\\b(do|if|while|for|each|function|fn|else|elsif|match|try|catch)\\b.*$",
+        "decreaseIndentPattern": "^\\s*(end|else|elsif|catch|finally)\\b"
     }
 }

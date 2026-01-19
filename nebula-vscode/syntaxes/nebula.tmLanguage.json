@@ -19,6 +19,9 @@
             "include": "#constants"
         },
         {
+            "include": "#types"
+        },
+        {
             "include": "#storage"
         },
         {
@@ -55,7 +58,7 @@
             "patterns": [
                 {
                     "name": "keyword.control.nebula",
-                    "match": "\\b(if|elsif|else|while|for|in|break|continue|match|try|catch|await|async|spawn)\\b"
+                    "match": "\\b(if|elsif|else|while|for|each|in|break|continue|match|try|catch|finally|await|async|spawn)\\b"
                 },
                 {
                     "name": "keyword.operator.word.nebula",
@@ -68,6 +71,18 @@
                 {
                     "name": "keyword.control.block.nebula",
                     "match": "\\b(do|end)\\b"
+                },
+                {
+                    "name": "keyword.control.module.nebula",
+                    "match": "\\b(mod|use|export|as|trait|type)\\b"
+                },
+                {
+                    "name": "keyword.control.error.nebula",
+                    "match": "\\b(err|assert)\\b"
+                },
+                {
+                    "name": "keyword.other.memory.nebula",
+                    "match": "\\b(move|unsafe|inline|free)\\b"
                 }
             ]
         },
@@ -75,17 +90,49 @@
             "name": "constant.language.nebula",
             "match": "\\b(on|off|empty)\\b"
         },
+        "types": {
+            "name": "support.type.nebula",
+            "match": "\\b(nb|int|fl|wrd|by|chr|any|void|lst|map|tup|set)\\b"
+        },
         "storage": {
             "name": "storage.type.nebula",
             "match": "\\b(perm|struct|enum)\\b"
         },
         "builtins": {
             "name": "support.function.nebula",
-            "match": "\\b(log|ask|len|root|wait|type|str|num|abs|floor|ceil|sin|cos|tan|pow|sqrt|rnd|now|sleep|dbg|typeof|get)\\b"
+            "match": "\\b(log|typeof|sqrt|abs|len|floor|ceil|round|pow|sin|cos|tan|exp|ln|get|rnd|dbg|now|sleep|str|num)\\b"
         },
         "operators": {
-            "name": "keyword.operator.nebula",
-            "match": "(\\+|\\-|\\*|\\/|%|\\^|==|!=|<=|>=|<|>|=)"
+            "patterns": [
+                {
+                    "name": "keyword.operator.arrow.nebula",
+                    "match": "(->|=>|<-|~>)"
+                },
+                {
+                    "name": "keyword.operator.range.nebula",
+                    "match": "(\\.\\.<|\\.\\.|\\.\\.)"
+                },
+                {
+                    "name": "keyword.operator.compound.nebula",
+                    "match": "(\\+\\+|\\+=|-=|\\*=|/=)"
+                },
+                {
+                    "name": "keyword.operator.bitwise.nebula",
+                    "match": "(<<|>>|\\^\\||&|\\||~)"
+                },
+                {
+                    "name": "keyword.operator.comparison.nebula",
+                    "match": "(==|!=|<=|>=|<|>)"
+                },
+                {
+                    "name": "keyword.operator.arithmetic.nebula",
+                    "match": "(\\+|-|\\*|/|%|\\^)"
+                },
+                {
+                    "name": "keyword.operator.assignment.nebula",
+                    "match": "="
+                }
+            ]
         },
         "functions": {
             "match": "\\b([a-zA-Z_][a-zA-Z0-9_]*)\\s*(?=\\()",

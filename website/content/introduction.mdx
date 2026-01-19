@@ -1,0 +1,203 @@
+---
+title: Introduction
+date: 2024-01-18
+---
+
+# Nebula
+
+**Nebula** is a compiled, high-performance scripting language designed for modern development. It combines Python's readability with the speed of compiled languages.
+
+## At a Glance
+
+```nebula
+fn main() do
+    perm users = ["Alice", "Bob", "Charlie"]
+    
+    each user in users do
+        log("Hello,", user)
+    end
+    
+    perm total = sum_range(1, 100)
+    log("Sum 1-100:", total)
+end
+
+fn sum_range(start, finish) do
+    total = 0
+    for i = start, finish do
+        total = total + i
+    end
+    give total
+end
+```
+
+## Core Philosophy
+
+| Principle | Implementation |
+|-----------|----------------|
+| **Readability** | Python-like syntax, `do`...`end` blocks |
+| **Safety** | `empty` instead of null, `on`/`off` for booleans |
+| **Performance** | NanBoxed values, bytecode VM, peephole optimization |
+| **Simplicity** | Minimal keywords, consistent rules |
+
+## Key Features
+
+### State Logic
+
+Replace confusing `true`/`false` with clear `on`/`off`:
+
+```nebula
+perm server_active = on
+perm maintenance_mode = off
+
+if server_active and !maintenance_mode do
+    log("Accepting connections...")
+end
+```
+
+### Safe Null Handling
+
+`empty` explicitly represents absence of value:
+
+```nebula
+fn find_user(id) do
+    if id == 0 do
+        give empty
+    end
+    give {"name": "User " + id}
+end
+
+perm user = find_user(0)
+if user == empty do
+    log("User not found")
+else
+    log("Found:", user["name"])
+end
+```
+
+### High Performance
+
+Up to 4x faster than Python:
+
+| Operation | Nebula | Python |
+|-----------|--------|--------|
+| Fibonacci(28) | 0.05s | 0.20s |
+| 1M iterations | 0.15s | 0.45s |
+| String ops | 0.08s | 0.12s |
+
+### First-Class Functions
+
+Functions are values you can pass around:
+
+```nebula
+fn apply_twice(func, value) do
+    give func(func(value))
+end
+
+fn add_five(x) = x + 5
+
+log(apply_twice(add_five, 10))  # 20
+```
+
+### Pattern Matching
+
+Clean switch-like syntax:
+
+```nebula
+fn http_status(code) do
+    match code do
+        200 => give "OK",
+        201 => give "Created",
+        400 => give "Bad Request",
+        404 => give "Not Found",
+        500 => give "Server Error",
+        _ => give "Unknown",
+    end
+end
+```
+
+### Error Handling
+
+Robust try-catch-finally:
+
+```nebula
+try do
+    perm data = load_file("config.json")
+    process(data)
+catch err do
+    log("Error:", err)
+    use_defaults()
+finally do
+    cleanup()
+end
+```
+
+## Language Overview
+
+### Types
+
+| Type | Keyword | Example |
+|------|---------|---------|
+| Integer | `int` | `42` |
+| Float | `fl` | `3.14159` |
+| String | `wrd` | `"hello"` |
+| Boolean | `bool` | `on`, `off` |
+| List | `lst` | `[1, 2, 3]` |
+| Map | `map` | `{"key": "val"}` |
+| Null | `nil` | `empty` |
+
+### Control Flow
+
+```nebula
+# Conditionals
+if condition do
+    # ...
+elsif other do
+    # ...
+else
+    # ...
+end
+
+# Loops
+while condition do ... end
+for i = 0, 10 do ... end
+each item in list do ... end
+```
+
+### Functions
+
+```nebula
+# Standard
+fn greet(name) do
+    log("Hello,", name)
+end
+
+# Short form
+fn double(x) = x * 2
+
+# Closure
+fn counter() do
+    count = 0
+    give fn() do
+        count = count + 1
+        give count
+    end
+end
+```
+
+## What's Next?
+
+1. **[Installation](/docs/installation)** - Get Nebula running
+2. **[CLI Reference](/docs/cli)** - Command-line usage
+3. **[Basics](/docs/basics)** - Variables and types
+4. **[Functions](/docs/functions)** - Reusable code
+5. **[Advanced](/docs/advanced)** - Structs, async, modules
+
+## Community
+
+- **GitHub**: [github.com/Sxf0z/Nebula](https://github.com/Sxf0z/Nebula)
+- **Issues**: Report bugs and request features
+- **Discussions**: Ask questions and share projects
+
+---
+
+**Built with 💜 and Rust**

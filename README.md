@@ -1,6 +1,6 @@
 # Nebula 🌌
 
-**Logic is Electric.**
+
 
 A compiled, high-performance scripting language.
 

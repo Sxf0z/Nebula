@@ -1,0 +1,163 @@
+---
+title: "Functions"
+description: "Defining functions, closures, and lambdas in Nebula."
+---
+
+# Functions
+
+Functions are first-class values in Nebula. Define them with `fn` or `function`.
+
+## Basic Definition
+
+Use `do`...`end` blocks. Return values with `give`.
+
+```nebula
+fn greet(name) do
+    log("Hello,", name)
+end
+
+fn add(a, b) do
+    give a + b
+end
+
+greet("Nebula")     # Hello, Nebula
+perm sum = add(5, 3)
+log(sum)            # 8
+```
+
+## Short Syntax
+
+For single-expression functions, use `=`:
+
+```nebula
+fn square(x) = x * x
+fn double(n) = n * 2
+fn greet(name) = "Hello, " + name
+
+log(square(5))    # 25
+log(double(10))   # 20
+```
+
+## Verbose Form
+
+You can use `function` instead of `fn`:
+
+```nebula
+function calculate(x, y) do
+    perm result = x * y + 10
+    give result
+end
+```
+
+## Multiple Parameters
+
+```nebula
+fn format_user(name, age, active) do
+    log("Name:", name)
+    log("Age:", age)
+    log("Active:", active)
+end
+
+format_user("Alex", 25, on)
+```
+
+## Returning Values
+
+Use `give` to return a value. Functions without `give` return `empty`.
+
+```nebula
+fn max(a, b) do
+    if a > b do
+        give a
+    end
+    give b
+end
+
+log(max(10, 5))   # 10
+log(max(3, 7))    # 7
+```
+
+## Closures
+
+Functions capture their surrounding scope:
+
+```nebula
+perm multiplier = 3
+
+fn scale(x) do
+    give x * multiplier
+end
+
+log(scale(10))   # 30
+log(scale(5))    # 15
+```
+
+### Factory Functions
+
+```nebula
+fn make_counter() do
+    count = 0
+    
+    fn increment() do
+        count = count + 1
+        give count
+    end
+    
+    give increment
+end
+
+perm counter = make_counter()
+log(counter())  # 1
+log(counter())  # 2
+log(counter())  # 3
+```
+
+## Recursion
+
+Functions can call themselves:
+
+```nebula
+fn factorial(n) do
+    if n <= 1 do
+        give 1
+    end
+    give n * factorial(n - 1)
+end
+
+log(factorial(5))   # 120
+
+fn fib(n) do
+    if n <= 1 do
+        give n
+    end
+    give fib(n - 1) + fib(n - 2)
+end
+
+log(fib(10))   # 55
+```
+
+## Functions as Values
+
+Pass functions as arguments:
+
+```nebula
+fn apply(func, value) do
+    give func(value)
+end
+
+fn triple(x) = x * 3
+
+log(apply(triple, 10))   # 30
+```
+
+## Lambdas (Arrow Functions)
+
+Short inline functions:
+
+```nebula
+perm double = (x) => x * 2
+log(double(5))   # 10
+
+perm add = (a, b) => a + b
+log(add(3, 4))   # 7
+```

@@ -1,9 +1,9 @@
 {
     "name": "nebula-lang",
     "displayName": "Nebula",
-    "description": "Galactic scripting language support. Logic is Electric.",
+    "description": "Full language support for Nebula (.na files). Syntax highlighting, code folding, run/debug integration, and the Nebula Galaxy dark theme.",
     "version": "1.0.0",
-    "publisher": "yourname",
+    "publisher": "Sxf0z",
     "repository": {
         "type": "git",
         "url": "https://github.com/Sxf0z/Nebula"
@@ -13,7 +13,16 @@
         "vscode": "^1.60.0"
     },
     "categories": [
-        "Programming Languages"
+        "Programming Languages",
+        "Themes",
+        "Debuggers"
+    ],
+    "keywords": [
+        "nebula",
+        "scripting",
+        "language",
+        "syntax",
+        "highlighter"
     ],
     "icon": "icon.png",
     "main": "./out/extension.js",
@@ -25,7 +34,8 @@
             {
                 "id": "nebula",
                 "aliases": [
-                    "Nebula"
+                    "Nebula",
+                    "nebula"
                 ],
                 "extensions": [
                     ".na"

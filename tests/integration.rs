@@ -3,7 +3,7 @@
 //! Tests verify that programs compile and run without crashing.
 //! Return value tests use variable reads which do return values.
 
-use specterscript::{Compiler, Lexer, Parser, VM};
+use nebula::{Compiler, Lexer, Parser, VM};
 
 /// Run code through VM - returns Ok if no crash/error
 fn run(code: &str) -> Result<(), String> {
@@ -145,7 +145,7 @@ fn test_parity_math() {
 fn test_heap_stats_available() {
     // Just verify the tracking functions compile and run
     // Note: Due to test parallelism, we can't guarantee zero counts
-    let (alloc, dealloc) = specterscript::vm::heap_stats();
+    let (alloc, dealloc) = nebula::vm::heap_stats();
     // Just verify these return reasonable values (not panicking)
     assert!(
         alloc >= dealloc,
@@ -157,12 +157,12 @@ fn test_heap_stats_available() {
 
 #[test]
 fn test_string_allocation_tracked() {
-    specterscript::vm::reset_stats();
+    nebula::vm::reset_stats();
 
     // Run code that creates a string
     run("fb msg = \"test\"").unwrap();
 
-    let (alloc, _) = specterscript::vm::heap_stats();
+    let (alloc, _) = nebula::vm::heap_stats();
     // At least one string should be allocated (the string constant)
     assert!(alloc >= 1, "Expected at least 1 allocation, got {}", alloc);
 }

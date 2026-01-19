@@ -1,0 +1,367 @@
+---
+title: "Data Structures"
+description: "Lists, Maps, Tuples, Sets, and collection operations."
+---
+
+# Data Structures
+
+Nebula provides powerful built-in collection types.
+
+## Lists (lst)
+
+Ordered, dynamic arrays.
+
+### Creating Lists
+
+```nebula
+# Empty list
+perm empty = []
+
+# With values
+perm numbers = [1, 2, 3, 4, 5]
+perm mixed = ["hello", 42, on, [1, 2]]
+
+# From range
+perm range_list = []
+for i = 0, 9 do
+    range_list = range_list + [i]
+end
+```
+
+### Accessing Elements
+
+```nebula
+perm colors = ["red", "green", "blue"]
+
+log(colors[0])   # red (first)
+log(colors[1])   # green (second)
+log(colors[2])   # blue (third)
+
+# Negative indexing (from end)
+log(colors[-1])  # blue (last)
+```
+
+### Modifying Lists
+
+```nebula
+items = ["a", "b", "c"]
+
+# Update element
+items[1] = "x"
+log(items)  # [a, x, c]
+
+# Append element
+items = items + ["d"]
+log(items)  # [a, x, c, d]
+
+# Append multiple
+items = items + ["e", "f"]
+```
+
+### List Operations
+
+```nebula
+perm nums = [1, 2, 3, 4, 5]
+
+# Length
+log(len(nums))  # 5
+
+# Check if empty
+if len(nums) == 0 do
+    log("Empty list")
+end
+
+# Sum all elements
+fn sum(list) do
+    total = 0
+    each n in list do
+        total = total + n
+    end
+    give total
+end
+
+log(sum(nums))  # 15
+```
+
+### List Comprehension (Pattern)
+
+```nebula
+# Double all numbers
+fn map_double(list) do
+    perm result = []
+    each n in list do
+        result = result + [n * 2]
+    end
+    give result
+end
+
+log(map_double([1, 2, 3]))  # [2, 4, 6]
+
+# Filter even numbers
+fn filter_even(list) do
+    perm result = []
+    each n in list do
+        if n % 2 == 0 do
+            result = result + [n]
+        end
+    end
+    give result
+end
+
+log(filter_even([1, 2, 3, 4, 5]))  # [2, 4]
+```
+
+## Maps (map)
+
+Key-value pairs for fast lookups.
+
+### Creating Maps
+
+```nebula
+# Empty map
+perm empty = {}
+
+# With values
+perm user = {
+    "name": "Alex",
+    "age": 25,
+    "active": on,
+    "roles": ["admin", "user"]
+}
+```
+
+### Accessing Values
+
+```nebula
+perm config = {
+    "host": "localhost",
+    "port": 8080,
+    "debug": on
+}
+
+log(config["host"])   # localhost
+log(config["port"])   # 8080
+log(config["debug"])  # on
+```
+
+### Modifying Maps
+
+```nebula
+settings = {"theme": "dark"}
+
+# Add/update key
+settings["language"] = "en"
+settings["theme"] = "light"
+
+log(settings)  # {theme: light, language: en}
+```
+
+### Checking Keys
+
+```nebula
+perm data = {"name": "Alice"}
+
+# Check if key exists
+if data["email"] == empty do
+    log("No email found")
+end
+
+fn has_key(map, key) do
+    give map[key] != empty
+end
+```
+
+### Iterating Maps
+
+```nebula
+perm scores = {
+    "alice": 95,
+    "bob": 87,
+    "charlie": 92
+}
+
+each name in scores do
+    log(name, "scored", scores[name])
+end
+```
+
+## Tuples (tup)
+
+Fixed-size, ordered collections.
+
+```nebula
+# Creating tuples
+perm point = (10, 20)
+perm rgb = (255, 128, 0)
+perm person = ("Alice", 30, on)
+
+# Accessing elements
+log(point[0])   # 10
+log(point[1])   # 20
+log(rgb[2])     # 0
+
+# Tuples are immutable - this would error:
+# point[0] = 5
+```
+
+### Tuple Patterns
+
+```nebula
+# Return multiple values
+fn divide_with_remainder(a, b) do
+    perm quotient = a / b
+    perm remainder = a % b
+    give (quotient, remainder)
+end
+
+perm result = divide_with_remainder(17, 5)
+log("Quotient:", result[0])   # 3
+log("Remainder:", result[1])  # 2
+```
+
+## Sets (set)
+
+Collections of unique values.
+
+```nebula
+# Creating sets
+perm unique = set(1, 2, 2, 3, 3, 3)
+# Contains only: 1, 2, 3
+
+# Set from list (removes duplicates)
+fn to_set(list) do
+    perm result = []
+    each item in list do
+        perm found = off
+        each existing in result do
+            if existing == item do
+                found = on
+                break
+            end
+        end
+        if found == off do
+            result = result + [item]
+        end
+    end
+    give result
+end
+
+log(to_set([1, 2, 2, 3, 1]))  # [1, 2, 3]
+```
+
+## Ranges
+
+Numeric sequences for iteration.
+
+```nebula
+# Inclusive range (0 to 10)
+for i = 0, 10 do
+    log(i)
+end
+# Output: 0 1 2 3 4 5 6 7 8 9 10
+
+# With step
+for i = 0, 20, 5 do
+    log(i)
+end
+# Output: 0 5 10 15 20
+
+# Countdown
+for i = 10, 0, -1 do
+    log(i)
+end
+# Output: 10 9 8 7 6 5 4 3 2 1 0
+```
+
+## Nested Structures
+
+Collections can contain other collections:
+
+```nebula
+# 2D matrix
+perm matrix = [
+    [1, 2, 3],
+    [4, 5, 6],
+    [7, 8, 9]
+]
+
+log(matrix[0][0])  # 1
+log(matrix[1][2])  # 6
+log(matrix[2][1])  # 8
+
+# List of maps
+perm users = [
+    {"name": "Alice", "age": 30},
+    {"name": "Bob", "age": 25},
+    {"name": "Charlie", "age": 35}
+]
+
+each user in users do
+    log(user["name"], "is", user["age"])
+end
+
+# Map of lists
+perm groups = {
+    "admins": ["alice", "bob"],
+    "users": ["charlie", "david", "eve"]
+}
+
+each role in groups do
+    each member in groups[role] do
+        log(role, "->", member)
+    end
+end
+```
+
+## Common Patterns
+
+### Find in List
+
+```nebula
+fn find(list, predicate) do
+    each item in list do
+        if predicate(item) do
+            give item
+        end
+    end
+    give empty
+end
+
+perm nums = [1, 2, 3, 4, 5]
+perm result = find(nums, fn(x) = x > 3)
+log(result)  # 4
+```
+
+### Reduce
+
+```nebula
+fn reduce(list, initial, reducer) do
+    perm acc = initial
+    each item in list do
+        acc = reducer(acc, item)
+    end
+    give acc
+end
+
+perm sum = reduce([1, 2, 3, 4], 0, fn(a, b) = a + b)
+log(sum)  # 10
+
+perm product = reduce([1, 2, 3, 4], 1, fn(a, b) = a * b)
+log(product)  # 24
+```
+
+### Reverse List
+
+```nebula
+fn reverse(list) do
+    perm result = []
+    perm i = len(list) - 1
+    while i >= 0 do
+        result = result + [list[i]]
+        i = i - 1
+    end
+    give result
+end
+
+log(reverse([1, 2, 3]))  # [3, 2, 1]
+```
